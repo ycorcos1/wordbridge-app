@@ -40,6 +40,30 @@
       a.button:hover {
         background-color: #3b83d1;
       }
+      button.button {
+        padding: 10px 16px;
+        border-radius: 6px;
+        background-color: #4da1ff;
+        color: #ffffff;
+        text-decoration: none;
+        font-weight: 600;
+        transition: background-color 0.2s ease;
+        font-family: inherit;
+        font-size: inherit;
+        cursor: pointer;
+      }
+      button.button.delete-button {
+        background-color: #dc3545;
+        border: none;
+      }
+      button.button.delete-button:hover {
+        background-color: #bb2d3b;
+        box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3);
+      }
+      button.button.delete-button:active {
+        background-color: #a02633;
+        transform: translateY(1px);
+      }
       .card {
         background-color: #ffffff;
         border-radius: 12px;
@@ -360,13 +384,12 @@
           >Upload Work</a
         >
         <button
-          class="button"
+          class="button delete-button"
           id="delete-student-button"
-          style="background-color: #dc3545; border: none; cursor: pointer;"
           data-student-id="{{ overview.student_id }}"
           data-student-name="{{ overview.name }}"
         >
-          Delete Student
+          🗑️ Delete Student
         </button>
         <a class="button" href="{{ url_for('core.logout') }}">Log Out</a>
       </nav>
