@@ -97,6 +97,7 @@ def get_connection():
         _connection = conn
         _backend = "sqlite"
     else:
+        # PostgreSQL connection
         conn = psycopg.connect(database_url, row_factory=dict_row)
         _connection = conn
         _backend = "postgres"
