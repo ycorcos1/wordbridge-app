@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from config.settings import get_settings
+from models import init_db
 from app.repositories import recommendations_repo, student_profiles_repo, uploads_repo
 from app.services import content_filter, pii, recommendations, text_extraction
 from app.services.openai_client import (
@@ -358,6 +359,17 @@ if __name__ == "__main__":
     signal.signal(signal.SIGTERM, signal_handler)
 
     logger.info("Starting WordBridge background worker...")
+    
+    # Initialize database to ensure tables exist
+    try:
+        logger.info("Initializing database...")
+        init_db()
+        logger.info("Database initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize database: {e}", exc_info=True)
+        logger.error("Worker cannot continue without database. Exiting.")
+        sys.exit(1)
+    
     logger.info("Worker will poll for upload jobs and process them asynchronously.")
     try:
         run_worker_loop()
