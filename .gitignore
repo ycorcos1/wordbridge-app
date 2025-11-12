@@ -25,3 +25,4 @@ venv/
 # IAM policy files (may contain sensitive info)
 iam-policy-*.json
 
+*.log

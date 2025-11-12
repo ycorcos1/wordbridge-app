@@ -55,13 +55,36 @@ def enqueue_upload_job(upload_id: int) -> None:
             return
         try:
             sqs = _make_boto_client("sqs")
-            sqs.send_message(
-                QueueUrl=queue_url,
-                MessageBody="upload_job",
-                MessageAttributes={
+            import uuid
+            import time
+            
+            # Create a unique message ID that includes timestamp and UUID
+            # This ensures each upload (even the same file after deletion) gets a unique message
+            # For FIFO queues, this prevents deduplication
+            # For standard queues, this is harmless but ensures uniqueness
+            unique_id = f"upload-{upload_id}-{int(time.time() * 1000)}-{uuid.uuid4().hex[:8]}"
+            
+            # Build message parameters
+            message_params = {
+                "QueueUrl": queue_url,
+                "MessageBody": f"upload_job_{upload_id}_{int(time.time())}",
+                "MessageAttributes": {
                     "upload_id": {"StringValue": str(upload_id), "DataType": "Number"}
                 },
-            )
+            }
+            
+            # Only add MessageDeduplicationId for FIFO queues
+            if ".fifo" in queue_url:
+                message_params["MessageDeduplicationId"] = unique_id
+                # FIFO queues also require MessageGroupId
+                message_params["MessageGroupId"] = "upload-jobs"
+            
+            sqs.send_message(**message_params)
+            
+            # Log for debugging
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.debug(f"Enqueued upload job {upload_id} with unique ID: {unique_id}")
             return
         except Exception as e:
             # If SQS fails, fall back to local queue and log the error

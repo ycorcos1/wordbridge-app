@@ -380,16 +380,13 @@
         <a class="button" href="{{ url_for('core.educator_dashboard') }}"
           >Dashboard</a
         >
-        <a class="button" href="{{ url_for('core.educator_upload_page') }}"
-          >Upload Work</a
-        >
         <button
           class="button delete-button"
           id="delete-student-button"
           data-student-id="{{ overview.student_id }}"
           data-student-name="{{ overview.name }}"
         >
-          🗑️ Delete Student
+          Delete Student
         </button>
         <a class="button" href="{{ url_for('core.logout') }}">Log Out</a>
       </nav>

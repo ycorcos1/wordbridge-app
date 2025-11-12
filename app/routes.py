@@ -549,6 +549,7 @@ def educator_dashboard():
             {
                 "id": row.get("id"),
                 "name": row.get("name"),
+                "username": row.get("username", ""),
                 "grade_level": grade,
                 "class_number": class_number_int,
                 "vocabulary_level": row.get("vocabulary_level"),
@@ -923,6 +924,10 @@ def _isoformat_or_none(value: object) -> Optional[str]:
 @bp.get("/api/student/dashboard")
 @role_required("student")
 def api_student_dashboard():
+    # CRITICAL: Reset database connection to ensure we're using PostgreSQL
+    from models import reset_engine
+    reset_engine()
+    
     student_id = current_user.id
     ensure_student_progress_row(student_id)
 
@@ -1012,12 +1017,19 @@ def student_dashboard():
     return render_template("student_dashboard.html")
 
 
-@bp.get("/educator/students/<int:student_id>")
+@bp.get("/educator/students/<username>")
 @role_required("educator")
-def educator_student_detail(student_id: int):
-    overview = get_student_overview(current_user.id, student_id)
+def educator_student_detail(username: str):
+    from models import get_student_overview_by_username
+    # CRITICAL: Reset database connection to ensure we're using PostgreSQL
+    from models import reset_engine
+    reset_engine()
+    
+    overview = get_student_overview_by_username(current_user.id, username)
     if overview is None:
         abort(404)
+    
+    student_id = overview["student_id"]
     
     # Fetch all uploads for this student
     uploads = list_uploads_for_student(student_id)
@@ -1071,6 +1083,11 @@ def educator_upload_page():
 @bp.post("/api/upload")
 @role_required("educator")
 def api_upload():
+    # CRITICAL: Reset database connection to ensure we're using PostgreSQL
+    # This must be done at the start of every request to prevent cached SQLite connections
+    from models import reset_engine
+    reset_engine()
+    
     student_id_raw = request.form.get("student_id", "").strip()
     if not student_id_raw:
         return jsonify({"error": "student_id is required"}), 400
@@ -1130,6 +1147,18 @@ def api_upload():
         try:
             s3_client.upload_fileobj(stream, settings.AWS_S3_BUCKET_NAME, s3_key)
             file_path = f"s3://{settings.AWS_S3_BUCKET_NAME}/{s3_key}"
+            
+            # CRITICAL: Ensure we're using the correct database before creating upload
+            # Reset connection to pick up any environment changes
+            from models import reset_engine, get_connection
+            reset_engine()
+            conn = get_connection()
+            # Log which database we're using for debugging
+            import logging
+            logger = logging.getLogger(__name__)
+            from models import _backend
+            logger.info(f"Creating upload record - backend: {_backend}, connection type: {type(conn)}")
+            
             upload_id = create_upload_record(
                 educator_id=current_user.id,
                 student_id=student_id,
@@ -1143,12 +1172,12 @@ def api_upload():
             logger = logging.getLogger(__name__)
             try:
                 enqueue_upload_job(upload_id)
-                logger.info(f"Successfully enqueued upload job {upload_id} for file {original_name}")
+                logger.info(f"Successfully enqueued upload job {upload_id} for file {original_name} (student {student_id})")
             except Exception as enqueue_error:
-                logger.error(f"CRITICAL: Failed to enqueue upload job {upload_id}: {enqueue_error}", exc_info=True)
-                # Re-raise so the outer handler can catch it and return an error
-                # This ensures the user knows the upload won't be processed
-                raise RuntimeError(f"Upload created but failed to queue for processing: {enqueue_error}") from enqueue_error
+                logger.error(f"CRITICAL: Failed to enqueue upload job {upload_id} for file {original_name}: {enqueue_error}", exc_info=True)
+                # Don't fail the upload - let the recovery function pick it up
+                # But log it so we know there's an issue
+                logger.warning(f"Upload {upload_id} created but not enqueued. Recovery function will pick it up within 1 minute.")
 
             results.append(
                 {
@@ -1170,11 +1199,21 @@ def api_upload():
     status_code = 207 if len(successful) != len(results) else 201
     
     # Add redirect URL and success message for successful uploads
+    # Get student username for the redirect URL
+    from models import get_student_profile
+    student_profile = get_student_profile(student_id)
+    student_username = student_profile.get("username") if student_profile else None
+    if student_username:
+        redirect_url = url_for("core.educator_student_detail", username=student_username)
+    else:
+        # Fallback to dashboard if username not found
+        redirect_url = url_for("core.educator_dashboard")
+    
     response_data = {
         "results": results,
         "success": True,
         "message": f"Successfully uploaded {len(successful)} file(s). Processing in background.",
-        "redirect_url": url_for("core.educator_student_detail", student_id=student_id)
+        "redirect_url": redirect_url
     }
     return jsonify(response_data), status_code
 
@@ -1182,6 +1221,10 @@ def api_upload():
 @bp.get("/api/job-status/<int:upload_id>")
 @role_required("educator")
 def api_job_status(upload_id: int):
+    # CRITICAL: Reset database connection to ensure we're using PostgreSQL
+    from models import reset_engine
+    reset_engine()
+    
     status = get_upload_status(upload_id)
     if status is None:
         return jsonify({"error": "Upload not found."}), 404
@@ -1192,6 +1235,10 @@ def api_job_status(upload_id: int):
 @role_required("educator")
 def api_delete_upload(student_id: int, upload_id: int):
     """Delete an upload for a student. Verifies the student belongs to the educator."""
+    # CRITICAL: Reset database connection to ensure we're using PostgreSQL
+    from models import reset_engine
+    reset_engine()
+    
     # Verify student belongs to educator
     overview = get_student_overview(current_user.id, student_id)
     if overview is None:
