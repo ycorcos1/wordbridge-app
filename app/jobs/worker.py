@@ -3,17 +3,25 @@ from __future__ import annotations
 import datetime
 import io
 import logging
+import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional
 
 import boto3
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
+# Load environment variables from .env file (if it exists)
+# In production, environment variables should be set directly
+env_path = Path(__file__).parent.parent.parent / ".env"
+if env_path.exists():
+    load_dotenv(env_path)
+else:
+    # Try loading from current directory
+    load_dotenv()
 
 from config.settings import get_settings
-from models import init_db
+from models import init_db, reset_engine
 from app.repositories import recommendations_repo, student_profiles_repo, uploads_repo
 from app.services import content_filter, pii, recommendations, text_extraction
 from app.services.openai_client import (
@@ -360,11 +368,30 @@ if __name__ == "__main__":
 
     logger.info("Starting WordBridge background worker...")
     
+    # Ensure we're using the correct database connection
+    # Reset connection to ensure we pick up environment variables
+    reset_engine()
+    
+    # Verify database configuration
+    settings = get_settings()
+    database_url = settings.DATABASE_URL
+    if database_url:
+        # Mask password in logs
+        masked_url = database_url.split("@")[-1] if "@" in database_url else database_url
+        logger.info(f"Database URL configured: postgresql://***@{masked_url}")
+    else:
+        logger.warning("DATABASE_URL not set, will use default SQLite database")
+    
     # Initialize database to ensure tables exist
     try:
         logger.info("Initializing database...")
         init_db()
-        logger.info("Database initialized successfully")
+        
+        # Verify connection works
+        from models import get_connection
+        conn = get_connection()
+        backend = "PostgreSQL" if "psycopg" in str(type(conn)) else "SQLite"
+        logger.info(f"Database initialized successfully (using {backend})")
     except Exception as e:
         logger.error(f"Failed to initialize database: {e}", exc_info=True)
         logger.error("Worker cannot continue without database. Exiting.")
