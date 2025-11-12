@@ -79,7 +79,13 @@ def get_connection():
     settings = get_settings()
     database_url = settings.DATABASE_URL or f"sqlite:///{_resolve_default_sqlite_path()}"
 
-    if database_url.startswith("sqlite"):
+    # Normalize database URL - handle postgres:// and postgresql://
+    if database_url and not database_url.startswith("sqlite"):
+        # Ensure it's treated as PostgreSQL
+        if database_url.startswith("postgres://"):
+            database_url = database_url.replace("postgres://", "postgresql://", 1)
+
+    if database_url and database_url.startswith("sqlite"):
         db_path = _normalize_sqlite_path(database_url)
         conn = sqlite3.connect(
             db_path,

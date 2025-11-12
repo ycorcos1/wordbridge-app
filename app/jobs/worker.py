@@ -15,13 +15,18 @@ from dotenv import load_dotenv
 # In production, environment variables should be set directly
 env_path = Path(__file__).parent.parent.parent / ".env"
 if env_path.exists():
-    load_dotenv(env_path)
+    load_dotenv(env_path, override=True)
 else:
     # Try loading from current directory
-    load_dotenv()
+    load_dotenv(override=True)
+
+# CRITICAL: Reset any existing database connection before importing models
+# This ensures we pick up the correct DATABASE_URL from environment
+from models import reset_engine
+reset_engine()
 
 from config.settings import get_settings
-from models import init_db, reset_engine
+from models import init_db
 from app.repositories import recommendations_repo, student_profiles_repo, uploads_repo
 from app.services import content_filter, pii, recommendations, text_extraction
 from app.services.openai_client import (
@@ -148,8 +153,31 @@ def _process_attempt(
     *,
     s3_client=None,
 ) -> None:
+    # Ensure we have a fresh database connection
+    from models import reset_engine, get_connection
+    reset_engine()
+    
     upload = uploads_repo.fetch_upload(upload_id)
     if not upload:
+        # Log more details for debugging
+        logger.error(f"Upload {upload_id} not found. Checking database...")
+        conn = get_connection()
+        cur = conn.cursor()
+        try:
+            from models import _backend
+            if _backend == "sqlite":
+                cur.execute("SELECT id, status FROM uploads WHERE id = ?", (upload_id,))
+            else:
+                cur.execute("SELECT id, status FROM uploads WHERE id = %s", (upload_id,))
+            row = cur.fetchone()
+            if row:
+                logger.error(f"Upload {upload_id} exists in database but fetch_upload() returned None")
+            else:
+                logger.error(f"Upload {upload_id} does not exist in database")
+        except Exception as e:
+            logger.error(f"Error checking database for upload {upload_id}: {e}")
+        finally:
+            cur.close()
         raise PermanentJobError(f"Upload {upload_id} was not found.")
 
     student_id = int(upload["student_id"])
@@ -387,11 +415,29 @@ if __name__ == "__main__":
         logger.info("Initializing database...")
         init_db()
         
-        # Verify connection works
-        from models import get_connection
+        # Reset connection again after init_db to ensure fresh connection
+        reset_engine()
+        
+        # Verify connection works and can query uploads
+        from models import get_connection, _backend
         conn = get_connection()
-        backend = "PostgreSQL" if "psycopg" in str(type(conn)) else "SQLite"
+        backend = "PostgreSQL" if _backend == "postgres" else "SQLite"
         logger.info(f"Database initialized successfully (using {backend})")
+        
+        # Test that we can actually query the database
+        cur = conn.cursor()
+        try:
+            if _backend == "sqlite":
+                cur.execute("SELECT COUNT(*) FROM uploads")
+            else:
+                cur.execute("SELECT COUNT(*) FROM uploads")
+            result = cur.fetchone()
+            count = result[0] if isinstance(result, (tuple, list)) else result.get("count", 0) if isinstance(result, dict) else 0
+            logger.info(f"Database connection verified - found {count} upload(s) in database")
+        except Exception as db_test_error:
+            logger.warning(f"Could not query uploads table (may not exist yet): {db_test_error}")
+        finally:
+            cur.close()
     except Exception as e:
         logger.error(f"Failed to initialize database: {e}", exc_info=True)
         logger.error("Worker cannot continue without database. Exiting.")
