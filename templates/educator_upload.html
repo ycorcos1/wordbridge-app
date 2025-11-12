@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Upload Student Work · WordBridge</title>
+    <style>
+      body {
+        font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+        margin: 0;
+        padding: 0;
+        color: #1e1e1e;
+      }
+      header {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 24px;
+        padding: 0;
+      }
+      h1 {
+        color: #1c3d5a;
+        margin: 0;
+        font-size: 28px;
+      }
+      header p {
+        margin: 4px 0 0;
+        font-size: 14px;
+        color: #334e68;
+      }
+      nav {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      a.button {
+        padding: 10px 16px;
+        border-radius: 6px;
+        background-color: #4da1ff;
+        color: #ffffff;
+        text-decoration: none;
+        font-weight: 600;
+        transition: background-color 0.2s ease;
+      }
+      a.button:hover {
+        background-color: #3b83d1;
+      }
+      body {
+        background-color: #f5f7fa;
+        padding: 32px;
+      }
+      main {
+        max-width: 800px;
+        margin: 0 auto;
+      }
+      main h1 {
+        color: #1c3d5a;
+        margin-top: 0;
+        font-size: 24px;
+      }
+      .selected-student {
+        padding: 12px;
+        border-radius: 6px;
+        background: #f5f7fa;
+        border: 1px solid #e0e0e0;
+        max-width: 360px;
+        font-size: 15px;
+      }
+      .selected-student strong {
+        color: #1c3d5a;
+      }
+      label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 6px;
+      }
+      select {
+        padding: 10px;
+        border-radius: 4px;
+        border: 1px solid #d0d0d0;
+        width: 100%;
+        max-width: 360px;
+      }
+      .dropzone {
+        margin-top: 20px;
+        border: 2px dashed #4da1ff;
+        border-radius: 8px;
+        padding: 30px;
+        text-align: center;
+        color: #1c3d5a;
+        background: #f5f7fa;
+        cursor: pointer;
+        transition: background 0.2s ease;
+      }
+      .dropzone.hover {
+        background: #e6f2ff;
+      }
+      .dropzone input[type="file"] {
+        display: none;
+      }
+      .file-list {
+        margin-top: 20px;
+        border: 1px solid #e0e0e0;
+        border-radius: 6px;
+        padding: 12px;
+        background: #fff;
+        max-width: 480px;
+      }
+      .file-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px solid #f0f0f0;
+        font-size: 14px;
+      }
+      .file-item:last-child {
+        border-bottom: 0;
+      }
+      .file-item button {
+        background: none;
+        border: none;
+        color: #e74c3c;
+        cursor: pointer;
+      }
+      .actions {
+        margin-top: 24px;
+      }
+      button.primary {
+        background: #4da1ff;
+        color: #fff;
+        border: none;
+        padding: 12px 20px;
+        border-radius: 6px;
+        font-size: 16px;
+        cursor: pointer;
+        transition: opacity 0.2s ease;
+      }
+      button.primary:disabled {
+        background: #a0c8f9;
+        cursor: not-allowed;
+      }
+      .meta {
+        margin-top: 8px;
+        color: #555;
+        font-size: 14px;
+      }
+      .result {
+        margin-top: 24px;
+        padding: 16px;
+        border-radius: 6px;
+        background: #f5f7fa;
+        max-width: 520px;
+        overflow: auto;
+      }
+      pre {
+        margin: 0;
+        font-size: 13px;
+      }
+      .empty {
+        color: #888;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <h1>WordBridge</h1>
+        <p>Upload Student Work</p>
+      </div>
+      <nav>
+        <a class="button" href="{{ url_for('core.educator_dashboard') }}"
+          >Dashboard</a
+        >
+        <a class="button" href="{{ url_for('core.educator_add_student') }}"
+          >Add Student</a
+        >
+        <a class="button" href="{{ url_for('core.educator_upload_page') }}"
+          >Upload Work</a
+        >
+        <a class="button" href="{{ url_for('core.logout') }}">Log Out</a>
+      </nav>
+    </header>
+    <main>
+      <p>
+        {% if selected_student %} Choose one or more files for {{
+        selected_student.name }}, and WordBridge will queue them for AI
+        processing. {% else %} Select a student, choose one or more files, and
+        WordBridge will queue them for AI processing. {% endif %}
+      </p>
+
+      <form id="upload-form">
+        <div>
+          {% if selected_student %}
+          <label>Student</label>
+          <div class="selected-student">
+            <strong>{{ selected_student.name }}</strong>
+            (Grade {{ selected_student.grade_level }}, Class {{
+            selected_student.class_number }})
+          </div>
+          <input
+            type="hidden"
+            id="student"
+            name="student_id"
+            value="{{ selected_student.id }}"
+          />
+          {% else %}
+          <label for="student">Student</label>
+          <select id="student" name="student_id" required>
+            <option value="">Select a student</option>
+            {% for student in students %}
+            <option value="{{ student.id }}">
+              {{ student.name }} (Grade {{ student.grade_level }}, Class {{
+              student.class_number }})
+            </option>
+            {% endfor %}
+          </select>
+          {% endif %}
+        </div>
+
+        <div
+          id="dropzone"
+          class="dropzone"
+          tabindex="0"
+          role="button"
+          aria-label="Upload files"
+        >
+          <p><strong>Drag &amp; drop</strong> files here or click to browse.</p>
+          <p class="meta">
+            Allowed: {{ allowed_extensions|join(", ") }} · Max {{ max_size_mb
+            }}MB each
+          </p>
+          <input
+            id="file-input"
+            type="file"
+            name="files"
+            multiple
+            accept=".txt,.docx,.pdf,.csv"
+          />
+        </div>
+
+        <div id="file-list" class="file-list" hidden></div>
+
+        <div class="actions">
+          <button id="upload-button" class="primary" type="submit" disabled>
+            Upload &amp; Process
+          </button>
+        </div>
+      </form>
+
+      <div id="results" class="result" hidden>
+        <pre id="results-json"></pre>
+      </div>
+    </main>
+
+    <script>
+      const dropzone = document.getElementById("dropzone");
+      const fileInput = document.getElementById("file-input");
+      const fileList = document.getElementById("file-list");
+      const uploadButton = document.getElementById("upload-button");
+      const studentSelect = document.getElementById("student");
+      const resultsContainer = document.getElementById("results");
+      const resultsPre = document.getElementById("results-json");
+
+      let pendingFiles = [];
+
+      function refreshFileList() {
+        fileList.innerHTML = "";
+        if (pendingFiles.length === 0) {
+          fileList.hidden = true;
+        } else {
+          fileList.hidden = false;
+          pendingFiles.forEach((file, index) => {
+            const item = document.createElement("div");
+            item.className = "file-item";
+            item.innerHTML = `
+              <span>${file.name}</span>
+              <button type="button" aria-label="Remove ${file.name}" data-index="${index}">Remove</button>
+            `;
+            item.querySelector("button").addEventListener("click", () => {
+              pendingFiles.splice(index, 1);
+              refreshFileList();
+            });
+            fileList.appendChild(item);
+          });
+        }
+        // Handle both select and hidden input cases
+        const studentId = studentSelect ? studentSelect.value : null;
+        uploadButton.disabled = !(pendingFiles.length && studentId);
+      }
+
+      function addFiles(files) {
+        pendingFiles = pendingFiles.concat(Array.from(files));
+        refreshFileList();
+      }
+
+      dropzone.addEventListener("click", () => fileInput.click());
+      dropzone.addEventListener("dragover", (event) => {
+        event.preventDefault();
+        dropzone.classList.add("hover");
+      });
+      dropzone.addEventListener("dragleave", () =>
+        dropzone.classList.remove("hover")
+      );
+      dropzone.addEventListener("drop", (event) => {
+        event.preventDefault();
+        dropzone.classList.remove("hover");
+        if (event.dataTransfer?.files?.length) {
+          addFiles(event.dataTransfer.files);
+        }
+      });
+      fileInput.addEventListener("change", (event) => {
+        if (event.target.files?.length) {
+          addFiles(event.target.files);
+          fileInput.value = "";
+        }
+      });
+      if (studentSelect && studentSelect.tagName === "SELECT") {
+        studentSelect.addEventListener("change", refreshFileList);
+      }
+
+      document
+        .getElementById("upload-form")
+        .addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const studentId = studentSelect ? studentSelect.value : null;
+          if (!studentId || !pendingFiles.length) {
+            return;
+          }
+
+          uploadButton.disabled = true;
+          uploadButton.textContent = "Uploading...";
+          resultsContainer.hidden = false;
+          resultsPre.textContent = "⏳ Upload in progress...";
+
+          const data = new FormData();
+          data.append("student_id", studentId);
+          pendingFiles.forEach((file) => data.append("files", file, file.name));
+
+          try {
+            const response = await fetch("/api/upload", {
+              method: "POST",
+              body: data,
+            });
+            const json = await response.json();
+
+            if (json.success && json.redirect_url) {
+              // Show success message briefly
+              resultsPre.textContent =
+                "✅ " + json.message + "\n\nRedirecting...";
+
+              // Redirect after 1 second
+              setTimeout(() => {
+                window.location.href = json.redirect_url;
+              }, 1000);
+            } else {
+              // Show error or partial success
+              resultsPre.textContent = JSON.stringify(json, null, 2);
+              uploadButton.disabled = false;
+              uploadButton.textContent = "Upload & Process";
+            }
+          } catch (error) {
+            resultsPre.textContent = `Error: ${error}`;
+            uploadButton.disabled = false;
+            uploadButton.textContent = "Upload & Process";
+          }
+        });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,32 @@
+[
+  {
+    "word": "hypothesis",
+    "definition": "An educated guess or proposed explanation made on the basis of limited evidence.",
+    "difficulty": 4,
+    "grade_level": 7
+  },
+  {
+    "word": "interpret",
+    "definition": "Explain the meaning of information, words, or actions.",
+    "difficulty": 4,
+    "grade_level": 7
+  },
+  {
+    "word": "contrast",
+    "definition": "Point out or describe the differences between two or more things.",
+    "difficulty": 4,
+    "grade_level": 7
+  },
+  {
+    "word": "evaluate",
+    "definition": "Judge or determine the significance, worth, or quality of something.",
+    "difficulty": 5,
+    "grade_level": 7
+  },
+  {
+    "word": "evidence",
+    "definition": "Facts, information, or signs that show something is true or valid.",
+    "difficulty": 3,
+    "grade_level": 7
+  }
+]

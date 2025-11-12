@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WordBridge – Student Dashboard</title>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: "Inter", "Roboto", "Helvetica Neue", Arial, sans-serif;
+        background-color: #f5f7fa;
+        color: #1e1e1e;
+      }
+      .app-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 24px 32px;
+        background-color: #ffffff;
+        border-bottom: 1px solid #d9e2ec;
+      }
+      .brand h1 {
+        margin: 0;
+        font-size: 24px;
+        color: #1c3d5a;
+      }
+      .brand p {
+        margin: 4px 0 0;
+        font-size: 14px;
+        color: #334e68;
+      }
+      .nav-actions {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      .nav-actions a {
+        text-decoration: none;
+        color: #1c3d5a;
+        font-weight: 600;
+        padding: 8px 16px;
+        border-radius: 20px;
+      }
+      .nav-actions a.active {
+        background-color: #e0ecff;
+      }
+      .logout-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 10px 18px;
+        border-radius: 6px;
+        background-color: #4da1ff;
+        border: none;
+        color: #ffffff;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+      }
+      main {
+        max-width: 1100px;
+        margin: 32px auto 48px;
+        padding: 0 24px 64px;
+      }
+      .messages {
+        list-style: none;
+        margin: 0 0 24px;
+        padding: 0;
+      }
+      .messages li {
+        padding: 12px 16px;
+        border-radius: 8px;
+        font-size: 14px;
+        margin-bottom: 8px;
+      }
+      .messages li.success {
+        background-color: #eaf9f0;
+        color: #1e7a3b;
+      }
+      .messages li.info {
+        background-color: #e8f2ff;
+        color: #1c3d5a;
+      }
+      .messages li.error {
+        background-color: #fdecea;
+        color: #b03a2e;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 24px;
+        margin-bottom: 24px;
+      }
+      .card {
+        background-color: #ffffff;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 16px 32px rgba(28, 61, 90, 0.08);
+      }
+      .card h2 {
+        margin: 0 0 16px;
+        font-size: 20px;
+        color: #1c3d5a;
+      }
+      .progress-metrics {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 16px;
+        margin-top: 16px;
+      }
+      .metric-tile {
+        background-color: #f5f7fa;
+        border-radius: 12px;
+        padding: 12px 16px;
+      }
+      .metric-label {
+        display: block;
+        font-size: 13px;
+        color: #486581;
+        margin-bottom: 6px;
+      }
+      .metric-value {
+        font-size: 22px;
+        font-weight: 600;
+        color: #1c3d5a;
+      }
+      .xp-bar {
+        position: relative;
+        height: 12px;
+        width: 100%;
+        border-radius: 999px;
+        background-color: #d9e2ec;
+        overflow: hidden;
+        margin: 8px 0;
+      }
+      .xp-bar-fill {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        width: 0%;
+        border-radius: 999px;
+        background-image: linear-gradient(90deg, #4da1ff, #1c69ff);
+        transition: width 0.6s ease;
+      }
+      .xp-summary {
+        display: flex;
+        justify-content: space-between;
+        font-size: 13px;
+        color: #486581;
+      }
+      .badges {
+        margin-top: 20px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .badge-chip {
+        padding: 6px 12px;
+        border-radius: 999px;
+        background-color: #eaf4fe;
+        color: #1c3d5a;
+        font-size: 13px;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .badge-chip.empty {
+        background-color: #f1f5f9;
+        color: #627d98;
+        font-weight: 500;
+      }
+      .card p.subtle {
+        margin-top: 0;
+        color: #627d98;
+        font-size: 14px;
+      }
+      .quiz-card button {
+        margin-top: 12px;
+        width: 100%;
+        padding: 14px;
+        font-size: 16px;
+        border-radius: 10px;
+        border: none;
+        background-color: #4da1ff;
+        color: #ffffff;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.2s ease, background-color 0.2s ease;
+      }
+      .quiz-card button:disabled {
+        background-color: #cbd2d9;
+        color: #7b8794;
+        cursor: not-allowed;
+        transform: none;
+      }
+      .quiz-card button:not(:disabled):hover {
+        background-color: #3584e4;
+        transform: translateY(-1px);
+      }
+      .quiz-card .hint {
+        margin-top: 12px;
+        font-size: 13px;
+        color: #486581;
+        text-align: center;
+      }
+      .words-card h2 {
+        margin-bottom: 8px;
+      }
+      .words-card header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+      .words-card header p {
+        margin: 0;
+        font-size: 14px;
+        color: #627d98;
+      }
+      .words-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .word-item {
+        border: 1px solid #dce3ec;
+        border-radius: 14px;
+        padding: 18px 20px;
+        background: #ffffff;
+        display: grid;
+        gap: 10px;
+      }
+      .word-top {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        justify-content: space-between;
+        align-items: baseline;
+      }
+      .word-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 18px;
+        font-weight: 600;
+        color: #102a43;
+      }
+      .word-title .info-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background-color: #4da1ff;
+        color: #ffffff;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: default;
+      }
+      .word-title .info-icon:hover,
+      .word-title .info-icon:focus-visible {
+        background-color: #1c69ff;
+      }
+      .pinned {
+        font-size: 14px;
+        color: #f39c12;
+      }
+      .difficulty {
+        font-size: 13px;
+        color: #486581;
+        font-weight: 600;
+      }
+      .definition,
+      .rationale,
+      .example {
+        margin: 0;
+        font-size: 14px;
+        color: #334e68;
+        line-height: 1.5;
+      }
+      .rationale strong {
+        color: #1c3d5a;
+      }
+      .mastery-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+        font-size: 13px;
+        color: #486581;
+      }
+      .difficulty-meter {
+        position: relative;
+        width: 140px;
+        height: 6px;
+        border-radius: 999px;
+        background-color: #dce3ec;
+        overflow: hidden;
+      }
+      .difficulty-meter span {
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        background: linear-gradient(90deg, #2ecc71, #f1c40f, #e74c3c);
+        width: 0%;
+        transition: width 0.4s ease;
+      }
+      .mastery-dots {
+        font-size: 16px;
+        letter-spacing: 2px;
+        color: #1c3d5a;
+      }
+      .empty-state {
+        text-align: center;
+        padding: 24px 16px;
+        background-color: #f5f7fa;
+        border-radius: 12px;
+        color: #627d98;
+        font-size: 14px;
+      }
+      @media (max-width: 720px) {
+        .app-header {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 16px;
+        }
+        .nav-actions {
+          width: 100%;
+          justify-content: space-between;
+        }
+        main {
+          padding: 0 16px 48px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="brand">
+        <h1>WordBridge</h1>
+        <p>Welcome back, {{ current_user.name }}.</p>
+      </div>
+      <div class="nav-actions">
+        <a class="logout-btn" href="{{ url_for('core.logout') }}">Log Out</a>
+      </div>
+    </header>
+    <main>
+      {% with messages = get_flashed_messages(with_categories=True) %} {% if
+      messages %}
+      <ul class="messages" role="status" aria-live="polite">
+        {% for category, message in messages %}
+        <li class="{{ category }}">{{ message }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %} {% endwith %}
+
+      <section class="grid" aria-label="Progress summary">
+        <article class="card">
+          <h2>Your Progress</h2>
+          <p class="subtle">
+            Track XP, levels, streaks, and badges as you master new words.
+          </p>
+          <div>
+            <div class="xp-bar" aria-hidden="true">
+              <div class="xp-bar-fill" data-xp-fill></div>
+            </div>
+            <div class="xp-summary">
+              <span data-xp-value>0 XP</span>
+              <span data-xp-next>0 / 500 this level</span>
+            </div>
+          </div>
+          <div class="progress-metrics">
+            <div class="metric-tile">
+              <span class="metric-label">Level</span>
+              <span class="metric-value" data-level>0</span>
+            </div>
+            <div class="metric-tile">
+              <span class="metric-label">Current Streak</span>
+              <span class="metric-value" data-streak>0</span>
+            </div>
+            <div class="metric-tile">
+              <span class="metric-label">Last Quiz</span>
+              <span class="metric-value" data-last-quiz>-</span>
+            </div>
+          </div>
+          <div class="badges" data-badges>
+            <span class="badge-chip empty"
+              >No badges yet — keep practicing!</span
+            >
+          </div>
+        </article>
+
+        <article class="card quiz-card">
+          <h2>Ready to Quiz?</h2>
+          <p class="subtle">
+            Practice approved words to boost your XP and keep your streak alive.
+          </p>
+          <button type="button" data-quiz-btn disabled>Start Quiz</button>
+          <p class="hint" data-quiz-hint>
+            Need at least 5 approved words to start a quiz.
+          </p>
+        </article>
+      </section>
+
+      <section
+        id="words"
+        class="card words-card"
+        aria-label="Approved vocabulary words"
+      >
+        <header>
+          <h2>Your Vocabulary Words</h2>
+          <p data-words-count>Loading approved words…</p>
+        </header>
+        <ul class="words-list" data-words-list>
+          <li class="empty-state">
+            Sit tight—your educator will approve words soon.
+          </li>
+        </ul>
+      </section>
+    </main>
+
+    <script>
+      const quizUrl = "/quiz";
+      function formatDate(value) {
+        if (!value) {
+          return "-";
+        }
+        try {
+          const date = new Date(value);
+          return date.toLocaleDateString(undefined, {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          });
+        } catch (err) {
+          return value;
+        }
+      }
+      function renderMasteryDots(correctCount) {
+        const total = 3;
+        const count = Math.max(0, Math.min(total, Number(correctCount) || 0));
+        let dots = "";
+        for (let i = 1; i <= total; i += 1) {
+          dots += i <= count ? "●" : "○";
+        }
+        return dots;
+      }
+      function stageLabel(stage) {
+        switch ((stage || "").toLowerCase()) {
+          case "nearly_mastered":
+          case "nearly mastered":
+            return "Nearly mastered";
+          case "mastered":
+            return "Mastered";
+          default:
+            return "Practicing";
+        }
+      }
+      document.addEventListener("DOMContentLoaded", () => {
+        const xpFill = document.querySelector("[data-xp-fill]");
+        const xpValueEl = document.querySelector("[data-xp-value]");
+        const xpNextEl = document.querySelector("[data-xp-next]");
+        const levelEl = document.querySelector("[data-level]");
+        const streakEl = document.querySelector("[data-streak]");
+        const lastQuizEl = document.querySelector("[data-last-quiz]");
+        const badgesContainer = document.querySelector("[data-badges]");
+        const wordsCountEl = document.querySelector("[data-words-count]");
+        const wordsListEl = document.querySelector("[data-words-list]");
+        const quizButton = document.querySelector("[data-quiz-btn]");
+        const quizHint = document.querySelector("[data-quiz-hint]");
+
+        fetch("{{ url_for('core.api_student_dashboard') }}", {
+          credentials: "same-origin",
+        })
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error("Failed to load dashboard data.");
+            }
+            return response.json();
+          })
+          .then((data) => {
+            const progress = data.progress || {};
+            const xp = Number(progress.xp) || 0;
+            const level = Number(progress.level) || 0;
+            const streak = Number(progress.streak_count) || 0;
+            const xpIntoLevel = xp % 500;
+            const xpPercent = Math.min(
+              100,
+              Math.round((xpIntoLevel / 500) * 100)
+            );
+
+            if (xpFill) {
+              xpFill.style.width = xpPercent + "%";
+            }
+            if (xpValueEl) {
+              xpValueEl.textContent = xp + " XP";
+            }
+            if (xpNextEl) {
+              xpNextEl.textContent = xpIntoLevel + " / 500 this level";
+            }
+            if (levelEl) {
+              levelEl.textContent = level;
+            }
+            if (streakEl) {
+              streakEl.textContent = streak;
+            }
+            if (lastQuizEl) {
+              lastQuizEl.textContent = formatDate(progress.last_quiz_at);
+            }
+
+            if (badgesContainer) {
+              badgesContainer.innerHTML = "";
+              const badges = Array.isArray(data.badges) ? data.badges : [];
+              if (!badges.length) {
+                const empty = document.createElement("span");
+                empty.className = "badge-chip empty";
+                empty.textContent = "No badges yet — keep practicing!";
+                badgesContainer.appendChild(empty);
+              } else {
+                badges
+                  .sort((a, b) => {
+                    const aDate = new Date(a.earned_at || 0).getTime();
+                    const bDate = new Date(b.earned_at || 0).getTime();
+                    return aDate - bDate;
+                  })
+                  .forEach((badge) => {
+                    const chip = document.createElement("span");
+                    chip.className = "badge-chip";
+                    chip.innerHTML =
+                      "🏅 " + (badge.badge_type || "").replace("_", " ");
+                    chip.title = "Earned " + formatDate(badge.earned_at);
+                    badgesContainer.appendChild(chip);
+                  });
+              }
+            }
+
+            const approvedWords = Array.isArray(data.approved_words)
+              ? data.approved_words
+              : [];
+            if (wordsCountEl) {
+              wordsCountEl.textContent = approvedWords.length
+                ? "Showing " + approvedWords.length + " approved words"
+                : "No approved words yet";
+            }
+            if (wordsListEl) {
+              wordsListEl.innerHTML = "";
+              if (!approvedWords.length) {
+                const emptyItem = document.createElement("li");
+                emptyItem.className = "empty-state";
+                emptyItem.textContent =
+                  "Once your educator approves words, you’ll see them listed here.";
+                wordsListEl.appendChild(emptyItem);
+              } else {
+                approvedWords.forEach((entry) => {
+                  const li = document.createElement("li");
+                  li.className = "word-item";
+
+                  const top = document.createElement("div");
+                  top.className = "word-top";
+
+                  const title = document.createElement("div");
+                  title.className = "word-title";
+                  title.textContent = entry.word || "Unknown word";
+
+                  if (entry.pinned) {
+                    const pin = document.createElement("span");
+                    pin.className = "pinned";
+                    pin.textContent = "★ pinned";
+                    title.appendChild(pin);
+                  }
+
+                  if (entry.rationale) {
+                    const info = document.createElement("span");
+                    info.className = "info-icon";
+                    info.textContent = "i";
+                    info.title = entry.rationale;
+                    info.setAttribute("aria-hidden", "true");
+                    title.appendChild(info);
+                  }
+
+                  const difficulty = document.createElement("span");
+                  difficulty.className = "difficulty";
+                  const score = Number(entry.difficulty_score) || 0;
+                  difficulty.textContent = "Difficulty " + score + " / 10";
+
+                  top.appendChild(title);
+                  top.appendChild(difficulty);
+                  li.appendChild(top);
+
+                  const difficultyMeter = document.createElement("div");
+                  difficultyMeter.className = "difficulty-meter";
+                  const meterFill = document.createElement("span");
+                  const clampedDifficulty = Math.min(
+                    10,
+                    Math.max(1, score || 1)
+                  );
+                  meterFill.style.width = (clampedDifficulty / 10) * 100 + "%";
+                  difficultyMeter.appendChild(meterFill);
+                  li.appendChild(difficultyMeter);
+
+                  const definition = document.createElement("p");
+                  definition.className = "definition";
+                  definition.textContent =
+                    entry.definition || "No definition available.";
+                  li.appendChild(definition);
+
+                  if (entry.rationale) {
+                    const rationale = document.createElement("p");
+                    rationale.className = "rationale";
+                    rationale.innerHTML =
+                      "<strong>Why this word:</strong> " + entry.rationale;
+                    li.appendChild(rationale);
+                  }
+
+                  if (entry.example_sentence) {
+                    const example = document.createElement("p");
+                    example.className = "example";
+                    example.innerHTML =
+                      "<strong>Example:</strong> " + entry.example_sentence;
+                    li.appendChild(example);
+                  }
+
+                  const mastery = document.createElement("div");
+                  mastery.className = "mastery-row";
+                  const masteryData = entry.mastery || {};
+                  const correctCount = masteryData.correct_count || 0;
+                  const dots = document.createElement("span");
+                  dots.className = "mastery-dots";
+                  dots.setAttribute("aria-hidden", "true");
+                  dots.textContent = renderMasteryDots(correctCount);
+
+                  const masteryText = document.createElement("span");
+                  masteryText.textContent =
+                    stageLabel(masteryData.mastery_stage) +
+                    " · " +
+                    (correctCount || 0) +
+                    " / 3 correct";
+
+                  mastery.appendChild(dots);
+                  mastery.appendChild(masteryText);
+
+                  li.appendChild(mastery);
+                  wordsListEl.appendChild(li);
+                });
+              }
+            }
+
+            if (quizButton && quizHint) {
+              if (data.can_start_quiz) {
+                quizButton.disabled = false;
+                quizHint.textContent =
+                  "Great! You can begin your next quiz anytime.";
+                quizButton.addEventListener("click", () => {
+                  window.location.assign(quizUrl);
+                });
+              } else {
+                quizButton.disabled = true;
+                quizHint.textContent =
+                  "Need at least 5 approved words to start a quiz.";
+              }
+            }
+          })
+          .catch((error) => {
+            console.error(error);
+            if (wordsListEl) {
+              wordsListEl.innerHTML = "";
+              const li = document.createElement("li");
+              li.className = "empty-state";
+              li.textContent =
+                "We hit a snag loading your data. Refresh the page or try again later.";
+              wordsListEl.appendChild(li);
+            }
+          });
+      });
+    </script>
+  </body>
+</html>

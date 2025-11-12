@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>WordBridge – Educator Dashboard</title>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f5f7fa;
+        margin: 0;
+        padding: 32px;
+        color: #1e1e1e;
+      }
+      header {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 24px;
+      }
+      h1 {
+        color: #1c3d5a;
+        margin: 0;
+        font-size: 28px;
+      }
+      header p {
+        margin: 4px 0 0;
+        font-size: 14px;
+        color: #334e68;
+      }
+      nav {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      a.button {
+        padding: 10px 16px;
+        border-radius: 6px;
+        background-color: #4da1ff;
+        color: #ffffff;
+        text-decoration: none;
+        font-weight: 600;
+        transition: background-color 0.2s ease;
+      }
+      a.button:hover {
+        background-color: #3b83d1;
+      }
+      .messages {
+        margin: 0 0 20px;
+        padding: 0;
+        list-style: none;
+      }
+      .messages li {
+        padding: 10px 14px;
+        border-radius: 6px;
+        margin-bottom: 8px;
+        font-size: 14px;
+      }
+      .messages li.success {
+        background-color: #eaf9f0;
+        color: #1e7a3b;
+      }
+      .messages li.info {
+        background-color: #e8f2ff;
+        color: #1c3d5a;
+      }
+      .messages li.error {
+        background-color: #fdecea;
+        color: #b03a2e;
+      }
+      .filter-bar {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 24px;
+        background-color: #ffffff;
+        padding: 16px;
+        border-radius: 12px;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+      }
+      .filter-controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        align-items: flex-end;
+      }
+      .filter-controls label {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 14px;
+        color: #1c3d5a;
+      }
+      .filter-controls select {
+        padding: 8px 12px;
+        border-radius: 6px;
+        border: 1px solid #d0d7de;
+        min-width: 160px;
+        font-size: 14px;
+        color: #1c3d5a;
+        background-color: #ffffff;
+        cursor: pointer;
+      }
+      .filter-controls select:disabled {
+        background-color: #f5f7fa;
+        color: #8a96a3;
+        cursor: not-allowed;
+      }
+      .filter-controls button {
+        padding: 8px 16px;
+        background-color: #6c757d;
+        color: #ffffff;
+        border: none;
+        border-radius: 6px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+      }
+      .filter-controls button:hover {
+        background-color: #5a6268;
+      }
+      .export-link {
+        padding: 9px 14px;
+        border-radius: 6px;
+        border: 1px solid #4da1ff;
+        color: #1c3d5a;
+        text-decoration: none;
+        font-weight: 600;
+        transition: background-color 0.2s ease, color 0.2s ease;
+      }
+      .export-link:hover {
+        background-color: #4da1ff;
+        color: #ffffff;
+      }
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+        max-width: 600px;
+      }
+      .summary-card {
+        background-color: #ffffff;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08);
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .summary-card .label {
+        font-size: 14px;
+        color: #5a6b7d;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+      }
+      .summary-card .value {
+        font-size: 28px;
+        font-weight: 700;
+        color: #1c3d5a;
+      }
+      .card {
+        background-color: #ffffff;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
+      }
+      .card h2 {
+        margin-top: 0;
+        color: #1c3d5a;
+        margin-bottom: 16px;
+      }
+      .grade-section {
+        margin-bottom: 32px;
+      }
+      .grade-heading {
+        color: #1c3d5a;
+        font-size: 20px;
+        margin: 0 0 16px;
+        border-bottom: 3px solid #4da1ff;
+        padding-bottom: 8px;
+      }
+      .class-section {
+        margin-bottom: 24px;
+      }
+      .class-heading {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+        color: #1c3d5a;
+        font-size: 16px;
+        font-weight: 600;
+        margin: 0 0 12px;
+      }
+      .class-meta {
+        font-size: 13px;
+        color: #5a6b7d;
+        font-weight: 400;
+      }
+      .table-wrapper {
+        overflow-x: auto;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 640px;
+      }
+      th,
+      td {
+        padding: 14px 12px;
+        text-align: left;
+        border-bottom: 1px solid #e0e0e0;
+        font-size: 14px;
+      }
+      th {
+        background-color: #f0f4f9;
+        color: #1c3d5a;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-size: 13px;
+      }
+      tr:hover td {
+        background-color: #f5faff;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .link-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 8px 12px;
+        border-radius: 6px;
+        border: 1px solid #4da1ff;
+        color: #1c3d5a;
+        font-weight: 600;
+        text-decoration: none;
+        transition: background-color 0.2s ease, color 0.2s ease;
+      }
+      .link-button:hover {
+        background-color: #4da1ff;
+        color: #ffffff;
+      }
+      .empty-state {
+        margin: 24px 0 0;
+        color: #5a6b7d;
+        font-size: 16px;
+      }
+      main {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 32px;
+      }
+      .grade-header,
+      .class-header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .export-link-small {
+        padding: 6px 12px;
+        font-size: 13px;
+      }
+      @media (max-width: 768px) {
+        body {
+          padding: 24px 16px;
+        }
+        .filter-bar {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .filter-controls {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .filter-controls select {
+          min-width: 100%;
+        }
+        .filter-controls button {
+          width: 100%;
+        }
+        table {
+          min-width: 560px;
+        }
+        .grade-header,
+        .class-header {
+          align-items: flex-start;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <h1>WordBridge</h1>
+        <p>Welcome, {{ current_user.name }}</p>
+      </div>
+      <nav>
+        <a class="button" href="{{ url_for('core.educator_add_student') }}"
+          >Add Student</a
+        >
+        <a class="button" href="{{ url_for('core.logout') }}">Log Out</a>
+      </nav>
+    </header>
+    <main>
+      {% with messages = get_flashed_messages(with_categories=True) %} {% if
+      messages %}
+      <ul class="messages">
+        {% for category, message in messages %}
+        <li class="{{ category }}">{{ message }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %} {% endwith %}
+      <div class="filter-bar">
+        <div class="filter-controls">
+          <label>
+            <span>Filter by grade</span>
+            <select id="grade-filter">
+              <option value="all">All grades</option>
+              <option value="6">6th grade</option>
+              <option value="7">7th grade</option>
+              <option value="8">8th grade</option>
+            </select>
+          </label>
+          <label>
+            <span>Filter by class</span>
+            <select id="class-filter" disabled>
+              <option value="all">All classes</option>
+            </select>
+          </label>
+          <button id="reset-filters" type="button">Reset filters</button>
+        </div>
+        <a class="export-link" href="{{ export_url }}"
+          >Export all students CSV</a
+        >
+      </div>
+      <section class="summary-grid">
+        <div class="summary-card">
+          <span class="label">Total Students</span>
+          <span class="value">{{ summary.total_students }}</span>
+        </div>
+        <div class="summary-card">
+          <span class="label">Pending Recommendations</span>
+          <span class="value">{{ summary.pending_recommendations }}</span>
+        </div>
+      </section>
+      <section class="card">
+        <h2>Overview</h2>
+        {% set ns = namespace(total=0) %} {% for class_map in
+        students_by_grade_and_class.values() %} {% for class_info in
+        class_map.values() %} {% set ns.total = ns.total +
+        (class_info.students|length) %} {% endfor %} {% endfor %} {% if ns.total
+        > 0 %} {% for grade in [6, 7, 8] %} {% set grade_classes =
+        students_by_grade_and_class.get(grade, {}) %} {% if grade_classes %}
+        <div class="grade-section" data-grade="{{ grade }}">
+          <div class="grade-header">
+            <h3 class="grade-heading">{{ grade }}th Grade</h3>
+            <a
+              class="export-link export-link-small"
+              href="{{ url_for('core.api_educator_export_grade', grade_level=grade) }}"
+              >Export {{ grade }}th grade CSV</a
+            >
+          </div>
+          {% for class_number, class_info in grade_classes|dictsort %}
+          <div
+            class="class-section"
+            data-grade="{{ grade }}"
+            data-class="{{ class_number }}"
+          >
+            <div class="class-header">
+              <div class="class-heading">
+                <span>Class {{ class_number }}</span>
+                <span class="class-meta">
+                  {{ class_info.count }} student{% if class_info.count != 1
+                  %}s{% endif %} • Avg proficiency: {{
+                  "%.1f"|format(class_info.avg_proficiency) }}
+                </span>
+              </div>
+              <a
+                class="export-link export-link-small"
+                href="{{ url_for('core.api_educator_export_class', grade_level=grade, class_number=class_number) }}"
+                >Export class CSV</a
+              >
+            </div>
+            <div class="table-wrapper">
+              <table
+                aria-label="Students overview for class {{ class_number }}"
+              >
+                <thead>
+                  <tr>
+                    <th scope="col">Name</th>
+                    <th scope="col">Vocabulary Level</th>
+                    <th scope="col">Pending Words</th>
+                    <th scope="col">Recommended Words</th>
+                    <th scope="col">Last Upload</th>
+                    <th scope="col">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for student in class_info.students %}
+                  <tr>
+                    <td>{{ student.name }}</td>
+                    <td>{{ student.vocabulary_level }}</td>
+                    <td>{{ student.pending_words }}</td>
+                    <td>{{ student.approved_words }}</td>
+                    <td>
+                      {% if student.last_upload_at %} {{ student.last_upload_at
+                      }} {% else %} — {% endif %}
+                    </td>
+                    <td>
+                      <div class="actions">
+                        <a
+                          class="link-button"
+                          href="{{ url_for('core.educator_student_detail', student_id=student.id) }}"
+                          >View Profile</a
+                        >
+                        <a
+                          class="link-button"
+                          href="{{ url_for('core.educator_upload_page', student_id=student.id) }}"
+                          >Upload Work</a
+                        >
+                      </div>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %} {% endfor %} {% else %}
+        <p class="empty-state">
+          You have not added any students yet. Start by creating student
+          accounts so you can track progress here.
+        </p>
+        {% endif %}
+      </section>
+    </main>
+    <script>
+      (function () {
+        const gradeFilter = document.getElementById("grade-filter");
+        const classFilter = document.getElementById("class-filter");
+        const resetButton = document.getElementById("reset-filters");
+        const gradeSections = Array.from(
+          document.querySelectorAll(".grade-section")
+        );
+        const classSections = Array.from(
+          document.querySelectorAll(".class-section")
+        );
+
+        if (!gradeFilter || !classFilter || !resetButton) {
+          return;
+        }
+
+        function populateClassOptions(selectedGrade) {
+          classFilter.innerHTML = '<option value="all">All classes</option>';
+
+          if (selectedGrade === "all") {
+            classFilter.disabled = true;
+            return;
+          }
+
+          const options = classSections
+            .filter((section) => section.dataset.grade === selectedGrade)
+            .map((section) => section.dataset.class);
+
+          options.forEach((value) => {
+            const option = document.createElement("option");
+            option.value = value;
+            option.textContent = `Class ${value}`;
+            classFilter.appendChild(option);
+          });
+
+          classFilter.disabled = options.length === 0;
+        }
+
+        function applyFilters() {
+          const gradeValue = gradeFilter.value;
+          const classValue = classFilter.value;
+
+          const params = new URLSearchParams();
+          if (gradeValue !== "all") {
+            params.set("grade", gradeValue);
+          }
+          if (classValue !== "all") {
+            params.set("class", classValue);
+          }
+
+          const query = params.toString();
+          const newUrl = query
+            ? `${window.location.pathname}?${query}`
+            : window.location.pathname;
+          window.history.replaceState(null, "", newUrl);
+
+          gradeSections.forEach((section) => {
+            const shouldShow =
+              gradeValue === "all" || section.dataset.grade === gradeValue;
+            section.style.display = shouldShow ? "block" : "none";
+          });
+
+          classSections.forEach((section) => {
+            const gradeMatches =
+              gradeValue === "all" || section.dataset.grade === gradeValue;
+            const classMatches =
+              classValue === "all" || section.dataset.class === classValue;
+            section.style.display =
+              gradeMatches && classMatches ? "block" : "none";
+          });
+        }
+
+        gradeFilter.addEventListener("change", () => {
+          populateClassOptions(gradeFilter.value);
+          classFilter.value = "all";
+          applyFilters();
+        });
+
+        classFilter.addEventListener("change", applyFilters);
+
+        resetButton.addEventListener("click", () => {
+          gradeFilter.value = "all";
+          classFilter.value = "all";
+          classFilter.disabled = true;
+          populateClassOptions("all");
+          applyFilters();
+        });
+
+        const params = new URLSearchParams(window.location.search);
+        const gradeParam = params.get("grade");
+        const classParam = params.get("class");
+
+        if (gradeParam && ["6", "7", "8"].includes(gradeParam)) {
+          gradeFilter.value = gradeParam;
+          populateClassOptions(gradeParam);
+          if (classParam) {
+            classFilter.value = classParam;
+          }
+        } else {
+          populateClassOptions("all");
+        }
+
+        applyFilters();
+      })();
+    </script>
+  </body>
+</html>

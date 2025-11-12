@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WordBridge – Vocabulary Quiz</title>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: "Inter", "Roboto", "Helvetica Neue", Arial, sans-serif;
+        background-color: #f5f7fa;
+        color: #1e1e1e;
+      }
+      .app-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 24px 32px;
+        background-color: #ffffff;
+        border-bottom: 1px solid #d9e2ec;
+      }
+      .brand h1 {
+        margin: 0;
+        font-size: 24px;
+        color: #1c3d5a;
+      }
+      .brand p {
+        margin: 4px 0 0;
+        font-size: 14px;
+        color: #334e68;
+      }
+      .nav-actions {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      .nav-actions a {
+        text-decoration: none;
+        color: #1c3d5a;
+        font-weight: 600;
+        padding: 8px 16px;
+        border-radius: 20px;
+      }
+      .nav-actions a.active {
+        background-color: #e0ecff;
+      }
+      .logout-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 10px 18px;
+        border-radius: 6px;
+        background-color: #4da1ff;
+        border: none;
+        color: #ffffff;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+      }
+      main {
+        max-width: 760px;
+        margin: 32px auto 48px;
+        padding: 0 24px 64px;
+      }
+      .card {
+        background-color: #ffffff;
+        border-radius: 16px;
+        padding: 32px;
+        box-shadow: 0 16px 32px rgba(28, 61, 90, 0.08);
+      }
+      .card h1 {
+        margin-top: 0;
+        margin-bottom: 12px;
+        font-size: 26px;
+        color: #1c3d5a;
+      }
+      .status-message {
+        margin: 0 0 16px;
+        color: #486581;
+        font-size: 15px;
+      }
+      .question-progress {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 14px;
+        color: #486581;
+        margin-bottom: 16px;
+      }
+      .question-word {
+        font-size: 22px;
+        font-weight: 700;
+        color: #102a43;
+        margin: 0 0 20px;
+      }
+      .choices {
+        display: grid;
+        gap: 12px;
+      }
+      .choice-btn {
+        width: 100%;
+        padding: 14px 16px;
+        border-radius: 12px;
+        border: 1px solid #d9e2ec;
+        background-color: #ffffff;
+        color: #102a43;
+        font-size: 15px;
+        text-align: left;
+        cursor: pointer;
+        transition: border-color 0.2s ease, transform 0.2s ease;
+      }
+      .choice-btn:hover:not([disabled]) {
+        border-color: #4da1ff;
+        transform: translateY(-1px);
+      }
+      .choice-btn[disabled] {
+        cursor: not-allowed;
+        opacity: 0.9;
+      }
+      .choice-btn.correct {
+        border-color: #2ecc71;
+        background-color: #ecfdf3;
+        color: #186a3b;
+        font-weight: 600;
+      }
+      .choice-btn.incorrect {
+        border-color: #e74c3c;
+        background-color: #fdecea;
+        color: #b03a2e;
+      }
+      .feedback {
+        margin-top: 20px;
+        padding: 16px;
+        border-radius: 12px;
+        background-color: #f5f7fa;
+        color: #334e68;
+        font-size: 15px;
+      }
+      .feedback strong {
+        color: #1c3d5a;
+      }
+      .next-btn {
+        margin-top: 24px;
+        padding: 14px 20px;
+        border-radius: 10px;
+        background-color: #4da1ff;
+        color: #ffffff;
+        border: none;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color 0.2s ease, transform 0.2s ease;
+      }
+      .next-btn:hover {
+        background-color: #3584e4;
+        transform: translateY(-1px);
+      }
+      .error-state {
+        color: #b03a2e;
+        background-color: #fdecea;
+        border-radius: 12px;
+        padding: 16px;
+        font-size: 15px;
+      }
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+      .modal-backdrop[hidden] {
+        display: none !important;
+      }
+      .modal {
+        background-color: #ffffff;
+        border-radius: 16px;
+        padding: 32px;
+        max-width: 420px;
+        width: 100%;
+        text-align: center;
+        box-shadow: 0 16px 32px rgba(0, 0, 0, 0.15);
+      }
+      .modal h2 {
+        margin-top: 0;
+        margin-bottom: 12px;
+        color: #1c3d5a;
+      }
+      .modal p {
+        margin: 8px 0;
+        color: #334e68;
+        font-size: 15px;
+      }
+      .badge-list {
+        margin: 16px 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: center;
+      }
+      .badge-chip {
+        padding: 6px 12px;
+        border-radius: 999px;
+        background-color: #eaf4fe;
+        color: #1c3d5a;
+        font-weight: 600;
+        font-size: 13px;
+      }
+      .modal-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 24px;
+      }
+      .modal-actions button,
+      .modal-actions a {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        padding: 14px 18px;
+        border-radius: 10px;
+        border: none;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+      }
+      .primary-action {
+        background-color: #4da1ff;
+        color: #ffffff;
+      }
+      .secondary-action {
+        background-color: #f5f7fa;
+        color: #1c3d5a;
+      }
+      @media (max-width: 640px) {
+        .app-header {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 16px;
+        }
+        main {
+          padding: 0 16px 48px;
+        }
+        .card {
+          padding: 24px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="card" aria-live="polite">
+        <h1>Vocabulary Quiz</h1>
+        <p class="status-message" data-status>Ready to start your quiz?</p>
+        <div data-start-container>
+          <button
+            type="button"
+            class="next-btn"
+            data-start-quiz
+            style="margin-top: 24px"
+          >
+            Start Quiz
+          </button>
+        </div>
+        <div data-question-container hidden>
+          <div class="question-progress">
+            <span>
+              Question <span data-question-number>1</span> of
+              <span data-question-total>10</span>
+            </span>
+            <span data-correct-tracker>0 correct so far</span>
+          </div>
+          <h2 class="question-word" data-question-word>Word</h2>
+          <div class="choices" data-choices></div>
+          <div class="feedback" data-feedback hidden>
+            <p data-feedback-headline></p>
+            <p data-feedback-detail></p>
+          </div>
+          <button type="button" class="next-btn" data-next hidden>
+            Next Question
+          </button>
+        </div>
+        <div class="error-state" data-error hidden></div>
+      </section>
+    </main>
+
+    <div class="modal-backdrop" data-modal hidden>
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="quiz-complete-heading"
+      >
+        <h2 id="quiz-complete-heading">Quiz Complete!</h2>
+        <p><strong>Score:</strong> <span data-result-score></span></p>
+        <p><strong>XP Earned:</strong> <span data-result-xp></span></p>
+        <p><strong>Streak:</strong> <span data-result-streak></span></p>
+        <div class="badge-list" data-result-badges></div>
+        <div class="modal-actions">
+          <a
+            class="primary-action"
+            href="{{ url_for('core.student_dashboard') }}"
+            >View Dashboard</a
+          >
+          <button type="button" class="secondary-action" data-retake>
+            Take Another Quiz
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const generateUrl = "{{ url_for('core.api_quiz_generate') }}";
+      const submitUrl = "{{ url_for('core.api_quiz_submit') }}";
+
+      const quizState = {
+        questions: [],
+        currentIndex: 0,
+        answers: [],
+        correct: 0,
+        submitting: false,
+      };
+
+      const statusEl = document.querySelector("[data-status]");
+      const startContainerEl = document.querySelector("[data-start-container]");
+      const containerEl = document.querySelector("[data-question-container]");
+      const questionNumberEl = document.querySelector("[data-question-number]");
+      const totalEl = document.querySelector("[data-question-total]");
+      const correctTrackerEl = document.querySelector("[data-correct-tracker]");
+      const wordEl = document.querySelector("[data-question-word]");
+      const choicesEl = document.querySelector("[data-choices]");
+      const feedbackEl = document.querySelector("[data-feedback]");
+      const feedbackHeadlineEl = document.querySelector(
+        "[data-feedback-headline]"
+      );
+      const feedbackDetailEl = document.querySelector("[data-feedback-detail]");
+      const nextBtn = document.querySelector("[data-next]");
+      const errorEl = document.querySelector("[data-error]");
+
+      const modalBackdrop = document.querySelector("[data-modal]");
+      const resultScoreEl = document.querySelector("[data-result-score]");
+      const resultXpEl = document.querySelector("[data-result-xp]");
+      const resultStreakEl = document.querySelector("[data-result-streak]");
+      const resultBadgesEl = document.querySelector("[data-result-badges]");
+      const retakeBtn = document.querySelector("[data-retake]");
+      if (modalBackdrop) {
+        modalBackdrop.hidden = true;
+      }
+
+      function setStatus(message) {
+        if (statusEl) {
+          statusEl.textContent = message;
+        }
+      }
+
+      function setError(message) {
+        if (!errorEl) return;
+        errorEl.hidden = false;
+        errorEl.textContent = message;
+      }
+
+      function clearError() {
+        if (!errorEl) return;
+        errorEl.hidden = true;
+        errorEl.textContent = "";
+      }
+
+      function resetFeedback() {
+        feedbackEl.hidden = true;
+        feedbackHeadlineEl.textContent = "";
+        feedbackDetailEl.textContent = "";
+      }
+
+      function disableChoices() {
+        choicesEl
+          .querySelectorAll("button[data-choice]")
+          .forEach((btn) => btn.setAttribute("disabled", "disabled"));
+      }
+
+      function enableChoices() {
+        choicesEl
+          .querySelectorAll("button[data-choice]")
+          .forEach((btn) => btn.removeAttribute("disabled"));
+      }
+
+      function updateCorrectTracker() {
+        if (!correctTrackerEl) return;
+        const label =
+          quizState.correct === 1 ? "correct so far" : "correct so far";
+        correctTrackerEl.textContent = `${quizState.correct} ${label}`;
+      }
+
+      function renderQuestion() {
+        resetFeedback();
+        nextBtn.hidden = true;
+        enableChoices();
+
+        const current = quizState.questions[quizState.currentIndex];
+        questionNumberEl.textContent = quizState.currentIndex + 1;
+        totalEl.textContent = quizState.questions.length;
+        wordEl.textContent = current.word || "Word";
+
+        choicesEl.innerHTML = "";
+        current.definition_choices.forEach((choice) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "choice-btn";
+          button.dataset.choice = choice;
+          button.textContent = choice;
+          button.addEventListener("click", () =>
+            handleChoice(button, current, choice)
+          );
+          choicesEl.appendChild(button);
+        });
+      }
+
+      function handleChoice(button, currentQuestion, selectedDefinition) {
+        disableChoices();
+
+        const correctDefinition = currentQuestion.correct_definition || "";
+
+        // Store player answer
+        quizState.answers[quizState.currentIndex] = {
+          word_id: currentQuestion.word_id,
+          answer: selectedDefinition,
+        };
+
+        const selectedNormalized = selectedDefinition.toLowerCase();
+        const correctNormalized = correctDefinition.toLowerCase();
+        const isCorrect = selectedNormalized === correctNormalized;
+
+        if (isCorrect) {
+          quizState.correct += 1;
+          button.classList.add("correct");
+          feedbackHeadlineEl.innerHTML =
+            "<strong>Great job!</strong> You chose the correct definition.";
+        } else {
+          button.classList.add("incorrect");
+          feedbackHeadlineEl.innerHTML =
+            "<strong>Almost!</strong> That's not the right definition.";
+        }
+
+        if (!isCorrect) {
+          choicesEl.querySelectorAll("button").forEach((btn) => {
+            const definition = btn.dataset.choice || "";
+            if (definition.toLowerCase() === correctNormalized) {
+              btn.classList.add("correct");
+            }
+          });
+        }
+
+        feedbackDetailEl.textContent = `Correct definition: ${correctDefinition}`;
+        feedbackEl.hidden = false;
+        updateCorrectTracker();
+
+        nextBtn.textContent =
+          quizState.currentIndex === quizState.questions.length - 1
+            ? "Finish Quiz"
+            : "Next Question";
+        nextBtn.hidden = false;
+      }
+
+      function handleNext() {
+        if (quizState.currentIndex < quizState.questions.length - 1) {
+          quizState.currentIndex += 1;
+          renderQuestion();
+        } else {
+          submitQuiz();
+        }
+      }
+
+      function showModal(summary) {
+        resultScoreEl.textContent = `${summary.correct} / ${summary.total}`;
+        resultXpEl.textContent = `${summary.xp_earned} XP`;
+        resultStreakEl.textContent = `${summary.progress.streak_count} day streak`;
+
+        resultBadgesEl.innerHTML = "";
+        const badges = Array.isArray(summary.badges_awarded)
+          ? summary.badges_awarded
+          : [];
+        if (!badges.length) {
+          const span = document.createElement("span");
+          span.className = "badge-chip";
+          span.textContent = "No new badges this time – keep going!";
+          resultBadgesEl.appendChild(span);
+        } else {
+          badges.forEach((badge) => {
+            const span = document.createElement("span");
+            span.className = "badge-chip";
+            span.textContent = `🏅 ${badge.replace("_", " ")}`;
+            resultBadgesEl.appendChild(span);
+          });
+        }
+
+        modalBackdrop.hidden = false;
+      }
+
+      function submitQuiz() {
+        if (quizState.submitting) {
+          return;
+        }
+
+        // Validate that we have answers for all questions
+        if (quizState.answers.length !== quizState.questions.length) {
+          setError("Please answer all questions before submitting.");
+          return;
+        }
+
+        // Validate that all answers are non-empty
+        const hasEmptyAnswers = quizState.answers.some(
+          (answer) => !answer || !answer.answer
+        );
+        if (hasEmptyAnswers) {
+          setError("Please answer all questions before submitting.");
+          return;
+        }
+
+        quizState.submitting = true;
+        setStatus("Scoring your quiz…");
+
+        fetch(submitUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "same-origin",
+          body: JSON.stringify({ answers: quizState.answers }),
+        })
+          .then((response) => {
+            if (!response.ok) {
+              return response.json().then((payload) => {
+                throw new Error(payload.error || "Unable to score quiz.");
+              });
+            }
+            return response.json();
+          })
+          .then((summary) => {
+            setStatus("Quiz complete!");
+            showModal(summary);
+          })
+          .catch((error) => {
+            setError(error.message);
+            quizState.submitting = false;
+          })
+          .finally(() => {
+            if (quizState.submitting) {
+              quizState.submitting = false;
+            }
+          });
+      }
+
+      function loadQuiz() {
+        setStatus("Loading your quiz…");
+        clearError();
+        modalBackdrop.hidden = true;
+        quizState.questions = [];
+        quizState.currentIndex = 0;
+        quizState.answers = [];
+        quizState.correct = 0;
+        updateCorrectTracker();
+
+        // Hide start container and show question container
+        if (startContainerEl) {
+          startContainerEl.hidden = true;
+        }
+        containerEl.hidden = false;
+
+        fetch(generateUrl, { credentials: "same-origin" })
+          .then((response) => {
+            if (!response.ok) {
+              return response.json().then((payload) => {
+                throw new Error(payload.error || "Unable to load quiz.");
+              });
+            }
+            return response.json();
+          })
+          .then((payload) => {
+            const items = Array.isArray(payload.questions)
+              ? payload.questions
+              : [];
+            if (!items.length) {
+              throw new Error(
+                "No quiz questions available. You need at least 5 approved words to take a quiz."
+              );
+            }
+
+            quizState.questions = items.map((entry) => {
+              const choices = Array.isArray(entry.definition_choices)
+                ? entry.definition_choices
+                : [];
+              const correctDefinition =
+                entry.correct_definition ||
+                entry.definition ||
+                (choices.length ? choices[0] : "");
+              return {
+                word_id: entry.word_id,
+                word: entry.word,
+                definition_choices: choices,
+                correct_definition: correctDefinition,
+              };
+            });
+
+            const total = quizState.questions.length;
+            totalEl.textContent = total;
+            updateCorrectTracker();
+
+            setStatus("Answer the questions to earn XP!");
+            renderQuestion();
+          })
+          .catch((error) => {
+            setStatus("Unable to start quiz.");
+            setError(error.message);
+            // Show start container again on error
+            if (startContainerEl) {
+              startContainerEl.hidden = false;
+            }
+            containerEl.hidden = true;
+          });
+      }
+
+      const startQuizBtn = document.querySelector("[data-start-quiz]");
+      if (startQuizBtn) {
+        startQuizBtn.addEventListener("click", loadQuiz);
+      }
+
+      nextBtn.addEventListener("click", handleNext);
+      retakeBtn.addEventListener("click", () => {
+        modalBackdrop.hidden = true;
+        // Show start container when retaking
+        if (startContainerEl) {
+          startContainerEl.hidden = false;
+        }
+        containerEl.hidden = true;
+        setStatus("Ready to start your quiz?");
+      });
+    </script>
+  </body>
+</html>

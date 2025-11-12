@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>WordBridge – Recommendations Review</title>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f5f7fa;
+        margin: 0;
+        padding: 32px;
+        color: #1e1e1e;
+      }
+      header {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 24px;
+      }
+      h1 {
+        color: #1c3d5a;
+        margin: 0;
+        font-size: 28px;
+      }
+      nav {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      a.button {
+        padding: 10px 16px;
+        border-radius: 6px;
+        background-color: #4da1ff;
+        color: #ffffff;
+        text-decoration: none;
+        font-weight: 600;
+        transition: background-color 0.2s ease;
+      }
+      a.button:hover,
+      button.primary:hover {
+        background-color: #3b83d1;
+      }
+      main {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+      .card {
+        background-color: #ffffff;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08);
+      }
+      .filters-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+      label {
+        font-size: 14px;
+        font-weight: 600;
+        color: #1c3d5a;
+        display: block;
+        margin-bottom: 6px;
+      }
+      select,
+      input[type="number"],
+      input[type="date"] {
+        width: 100%;
+        padding: 9px 10px;
+        border-radius: 6px;
+        border: 1px solid #d0d0d0;
+        font-size: 14px;
+        background-color: #ffffff;
+      }
+      select:focus,
+      input[type="number"]:focus,
+      input[type="date"]:focus {
+        outline: none;
+        border-color: #4da1ff;
+        box-shadow: 0 0 0 2px rgba(77, 161, 255, 0.15);
+      }
+      .filter-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 8px;
+      }
+      button.primary,
+      button.secondary {
+        padding: 10px 16px;
+        border-radius: 6px;
+        border: none;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color 0.2s ease, color 0.2s ease,
+          border 0.2s ease;
+      }
+      button.primary {
+        background-color: #4da1ff;
+        color: #ffffff;
+      }
+      button.secondary {
+        background-color: #ffffff;
+        color: #1c3d5a;
+        border: 1px solid #4da1ff;
+      }
+      button.secondary:hover {
+        background-color: #e8f2ff;
+      }
+      button:disabled {
+        background-color: #cbd6e4 !important;
+        color: #ffffff !important;
+        cursor: not-allowed;
+        border-color: #cbd6e4 !important;
+      }
+      .summary-bar {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+      }
+      .summary-info {
+        font-size: 16px;
+        color: #1c3d5a;
+        font-weight: 600;
+      }
+      .bulk-controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+      }
+      .bulk-controls label {
+        margin: 0;
+        font-weight: 500;
+        color: #1e1e1e;
+      }
+      .recommendations-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 18px;
+      }
+      .recommendation-card {
+        background-color: #ffffff;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
+        border: 1px solid transparent;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        position: relative;
+      }
+      .recommendation-card.pinned {
+        border-color: #4da1ff;
+      }
+      .card-header {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+      }
+      .card-header h2 {
+        font-size: 20px;
+        margin: 0;
+        color: #1c3d5a;
+      }
+      .student-name {
+        font-size: 14px;
+        color: #5a6b7d;
+      }
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        font-size: 13px;
+        color: #5a6b7d;
+      }
+      .difficulty-meter {
+        position: relative;
+        background-color: #e8f2ff;
+        border-radius: 999px;
+        height: 8px;
+        overflow: hidden;
+      }
+      .difficulty-meter span {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        background: linear-gradient(90deg, #4da1ff, #1c3d5a);
+        transition: width 0.3s ease;
+      }
+      .card-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .card-actions button {
+        padding: 8px 12px;
+        border-radius: 6px;
+        border: 1px solid #4da1ff;
+        background-color: #ffffff;
+        color: #1c3d5a;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color 0.2s ease, color 0.2s ease;
+      }
+      .card-actions button:hover {
+        background-color: #4da1ff;
+        color: #ffffff;
+      }
+      .card-checkbox {
+        margin-top: 4px;
+      }
+      .rationale,
+      .definition,
+      .example {
+        font-size: 14px;
+        line-height: 1.6;
+        color: #1e1e1e;
+      }
+      .example {
+        font-style: italic;
+        color: #3b4b5b;
+      }
+      .empty-state {
+        font-size: 16px;
+        color: #5a6b7d;
+        text-align: center;
+        padding: 40px 20px;
+        background-color: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.08);
+      }
+      #toast-container {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        z-index: 1000;
+      }
+      .toast {
+        min-width: 220px;
+        padding: 12px 16px;
+        border-radius: 8px;
+        color: #ffffff;
+        font-weight: 600;
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        opacity: 0;
+        transform: translateY(-10px);
+        animation: toast-in 0.3s forwards;
+      }
+      .toast.success {
+        background-color: #2ecc71;
+      }
+      .toast.error {
+        background-color: #e74c3c;
+      }
+      @keyframes toast-in {
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      @media (max-width: 768px) {
+        body {
+          padding: 24px 16px;
+        }
+        .recommendations-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <h1>Recommendation Review</h1>
+        <p>
+          Approve or refine AI-suggested vocabulary before sharing with
+          students.
+        </p>
+      </div>
+      <nav>
+        <a class="button" href="{{ url_for('core.educator_dashboard') }}"
+          >Dashboard</a
+        >
+        <a class="button" href="{{ url_for('core.educator_add_student') }}"
+          >Add Student</a
+        >
+        <a class="button" href="{{ url_for('core.educator_upload_page') }}"
+          >Upload Work</a
+        >
+        <a class="button" href="{{ url_for('core.logout') }}">Log Out</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="card">
+        <form id="filters-form">
+          <div class="filters-grid">
+            <div>
+              <label for="filter-student">Student</label>
+              <select id="filter-student" name="student_id">
+                <option value="">All Students</option>
+                {% for student in students %}
+                <option value="{{ student.id }}">
+                  {{ student.name }} (Grade {{ student.grade_level }}, Class {{
+                  student.class_number }})
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label for="filter-difficulty-min">Difficulty Min</label>
+              <input
+                type="number"
+                id="filter-difficulty-min"
+                name="difficulty_min"
+                min="1"
+                max="10"
+                placeholder="1"
+              />
+            </div>
+            <div>
+              <label for="filter-difficulty-max">Difficulty Max</label>
+              <input
+                type="number"
+                id="filter-difficulty-max"
+                name="difficulty_max"
+                min="1"
+                max="10"
+                placeholder="10"
+              />
+            </div>
+            <div>
+              <label for="filter-date-from">Date From</label>
+              <input type="date" id="filter-date-from" name="date_from" />
+            </div>
+            <div>
+              <label for="filter-date-to">Date To</label>
+              <input type="date" id="filter-date-to" name="date_to" />
+            </div>
+            <div>
+              <label for="filter-status">Status</label>
+              <select id="filter-status" name="status">
+                <option value="pending" selected>Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+                <option value="all">All</option>
+              </select>
+            </div>
+          </div>
+          <div class="filter-actions">
+            <button type="submit" class="primary" id="apply-filters">
+              Apply Filters
+            </button>
+            <button type="button" class="secondary" id="reset-filters">
+              Reset
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card summary-bar">
+        <div class="summary-info">
+          <span id="results-count">0</span> recommendations found
+          <span id="results-status-label">(pending)</span>
+        </div>
+        <div class="bulk-controls">
+          <label>
+            <input type="checkbox" id="select-all" />
+            Select all
+          </label>
+          <button type="button" class="secondary" id="bulk-approve" disabled>
+            Approve Selected
+          </button>
+          <button type="button" class="secondary" id="bulk-reject" disabled>
+            Reject Selected
+          </button>
+        </div>
+      </section>
+
+      <section
+        id="recommendations-container"
+        class="recommendations-grid"
+        aria-live="polite"
+      >
+        <p class="empty-state" id="loading-state">Loading recommendations…</p>
+      </section>
+    </main>
+
+    <div id="toast-container" aria-live="polite" aria-atomic="true"></div>
+    <div
+      id="app-config"
+      data-fetch-url="{{ url_for('core.api_list_recommendations') }}"
+      data-approve-url="{{ url_for('core.api_recommendations_approve') }}"
+      data-reject-url="{{ url_for('core.api_recommendations_reject') }}"
+      data-edit-url="{{ url_for('core.api_recommendations_edit') }}"
+      data-pin-url="{{ url_for('core.api_recommendations_pin') }}"
+    ></div>
+
+    <script>
+      (function () {
+        const configEl = document.getElementById("app-config");
+        const fetchUrl = configEl.dataset.fetchUrl;
+        const approveUrl = configEl.dataset.approveUrl;
+        const rejectUrl = configEl.dataset.rejectUrl;
+        const editUrl = configEl.dataset.editUrl;
+        const pinUrl = configEl.dataset.pinUrl;
+
+        const form = document.getElementById("filters-form");
+        const container = document.getElementById("recommendations-container");
+        const resultsCountEl = document.getElementById("results-count");
+        const resultsStatusEl = document.getElementById("results-status-label");
+        const selectAllCheckbox = document.getElementById("select-all");
+        const bulkApproveBtn = document.getElementById("bulk-approve");
+        const bulkRejectBtn = document.getElementById("bulk-reject");
+        const toastContainer = document.getElementById("toast-container");
+
+        let isLoading = false;
+
+        function showToast(message, type = "success") {
+          const toast = document.createElement("div");
+          toast.className = `toast ${type}`;
+          toast.textContent = message;
+          toastContainer.appendChild(toast);
+          setTimeout(() => {
+            toast.classList.add("fade-out");
+            toast.style.opacity = "0";
+            toast.style.transform = "translateY(-10px)";
+            setTimeout(() => {
+              toast.remove();
+            }, 250);
+          }, 4000);
+        }
+
+        function getSelectedIds() {
+          return Array.from(
+            container.querySelectorAll(
+              '.recommendation-card input[type="checkbox"]:checked'
+            )
+          ).map((checkbox) => Number(checkbox.value));
+        }
+
+        function updateBulkButtons() {
+          const selected = getSelectedIds();
+          const hasSelection = selected.length > 0;
+          bulkApproveBtn.disabled = !hasSelection;
+          bulkRejectBtn.disabled = !hasSelection;
+          const selectable = container.querySelectorAll(
+            '.recommendation-card input[type="checkbox"]'
+          );
+          if (selectable.length === 0) {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = false;
+            return;
+          }
+          const checked = selected.length;
+          if (checked === selectable.length) {
+            selectAllCheckbox.checked = true;
+            selectAllCheckbox.indeterminate = false;
+          } else if (checked === 0) {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = false;
+          } else {
+            selectAllCheckbox.indeterminate = true;
+          }
+        }
+
+        function setLoadingState() {
+          isLoading = true;
+          container.innerHTML =
+            '<p class="empty-state" id="loading-state">Loading recommendations…</p>';
+        }
+
+        function renderCards(items) {
+          container.innerHTML = "";
+          if (!items || items.length === 0) {
+            container.innerHTML =
+              '<p class="empty-state">No recommendations match your filters right now.</p>';
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = false;
+            bulkApproveBtn.disabled = true;
+            bulkRejectBtn.disabled = true;
+            return;
+          }
+
+          items.forEach((item) => {
+            const card = document.createElement("article");
+            card.className = "recommendation-card";
+            card.dataset.id = String(item.id);
+            card.dataset.pinned = item.pinned ? "true" : "false";
+            if (item.pinned) {
+              card.classList.add("pinned");
+            }
+
+            const header = document.createElement("div");
+            header.className = "card-header";
+
+            const checkboxWrapper = document.createElement("div");
+            checkboxWrapper.className = "card-checkbox";
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.value = String(item.id);
+            checkboxWrapper.appendChild(checkbox);
+
+            const titleWrapper = document.createElement("div");
+            const wordHeading = document.createElement("h2");
+            wordHeading.textContent = item.word;
+            const studentName = document.createElement("div");
+            studentName.className = "student-name";
+            studentName.textContent = `${
+              item.student_name || "Unknown Student"
+            } • ${item.status.charAt(0).toUpperCase() + item.status.slice(1)}`;
+            titleWrapper.appendChild(wordHeading);
+            titleWrapper.appendChild(studentName);
+
+            header.appendChild(checkboxWrapper);
+            header.appendChild(titleWrapper);
+
+            const definition = document.createElement("div");
+            definition.className = "definition";
+            definition.textContent =
+              item.definition || "Definition unavailable.";
+
+            const rationale = document.createElement("div");
+            rationale.className = "rationale";
+            rationale.textContent = item.rationale || "No rationale provided.";
+
+            const example = document.createElement("div");
+            example.className = "example";
+            example.textContent = item.example_sentence
+              ? `Example: ${item.example_sentence}`
+              : "No example sentence provided.";
+
+            const meta = document.createElement("div");
+            meta.className = "meta";
+
+            const difficultyLabel = document.createElement("span");
+            difficultyLabel.textContent = `Difficulty: ${item.difficulty_score}/10`;
+
+            const createdLabel = document.createElement("span");
+            createdLabel.textContent = item.created_at
+              ? `Added ${new Date(item.created_at).toLocaleDateString()}`
+              : "Created recently";
+
+            const meter = document.createElement("div");
+            meter.className = "difficulty-meter";
+            const meterFill = document.createElement("span");
+            const clampedDifficulty = Math.min(
+              10,
+              Math.max(1, item.difficulty_score || 1)
+            );
+            meterFill.style.width = `${(clampedDifficulty / 10) * 100}%`;
+            meter.appendChild(meterFill);
+
+            meta.appendChild(difficultyLabel);
+            meta.appendChild(createdLabel);
+
+            const actions = document.createElement("div");
+            actions.className = "card-actions";
+
+            const approveBtn = document.createElement("button");
+            approveBtn.type = "button";
+            approveBtn.dataset.action = "approve";
+            approveBtn.textContent = "Approve";
+
+            const rejectBtn = document.createElement("button");
+            rejectBtn.type = "button";
+            rejectBtn.dataset.action = "reject";
+            rejectBtn.textContent = "Reject";
+
+            const editBtn = document.createElement("button");
+            editBtn.type = "button";
+            editBtn.dataset.action = "edit";
+            editBtn.textContent = "Edit Rationale";
+
+            const pinBtn = document.createElement("button");
+            pinBtn.type = "button";
+            pinBtn.dataset.action = "pin";
+            pinBtn.textContent = item.pinned ? "Unpin" : "Pin";
+
+            actions.appendChild(approveBtn);
+            actions.appendChild(rejectBtn);
+            actions.appendChild(editBtn);
+            actions.appendChild(pinBtn);
+
+            card.appendChild(header);
+            card.appendChild(definition);
+            card.appendChild(rationale);
+            card.appendChild(example);
+            card.appendChild(meta);
+            card.appendChild(meter);
+            card.appendChild(actions);
+
+            container.appendChild(card);
+          });
+
+          updateBulkButtons();
+        }
+
+        async function performBulkAction(url, ids) {
+          const body = { ids };
+          try {
+            const response = await fetch(url, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+            });
+            const payload = await response.json();
+            if (!response.ok) {
+              throw new Error(payload.error || "Action failed.");
+            }
+            showToast(
+              `Updated ${payload.updated} recommendation(s).`,
+              "success"
+            );
+            await loadRecommendations();
+          } catch (error) {
+            showToast(
+              error.message || "Unable to update recommendations.",
+              "error"
+            );
+          }
+        }
+
+        async function performEdit(id, rationale) {
+          try {
+            const response = await fetch(editUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ id, rationale }),
+            });
+            const payload = await response.json();
+            if (!response.ok) {
+              throw new Error(payload.error || "Edit failed.");
+            }
+            showToast("Rationale updated.", "success");
+            await loadRecommendations();
+          } catch (error) {
+            showToast(error.message || "Unable to update rationale.", "error");
+          }
+        }
+
+        async function performPin(id, pinned) {
+          try {
+            const response = await fetch(pinUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ id, pinned }),
+            });
+            const payload = await response.json();
+            if (!response.ok) {
+              throw new Error(
+                payload.error || "Unable to update pinned state."
+              );
+            }
+            showToast(
+              payload.pinned
+                ? "Recommendation pinned."
+                : "Recommendation unpinned.",
+              "success"
+            );
+            await loadRecommendations();
+          } catch (error) {
+            showToast(
+              error.message || "Unable to update pinned state.",
+              "error"
+            );
+          }
+        }
+
+        async function loadRecommendations() {
+          if (isLoading) {
+            return;
+          }
+          setLoadingState();
+          const formData = new FormData(form);
+          const params = new URLSearchParams();
+          for (const [key, value] of formData.entries()) {
+            if (!value) {
+              continue;
+            }
+            if (key === "status" && value === "all") {
+              continue;
+            }
+            params.set(key, value);
+          }
+          params.set("limit", "100");
+
+          const statusFilter = formData.get("status") || "pending";
+          resultsStatusEl.textContent =
+            statusFilter === "all" ? "(all statuses)" : `(${statusFilter})`;
+
+          try {
+            const response = await fetch(`${fetchUrl}?${params.toString()}`);
+            const payload = await response.json();
+            if (!response.ok) {
+              throw new Error(
+                payload.error || "Unable to load recommendations."
+              );
+            }
+            renderCards(payload.items || []);
+            resultsCountEl.textContent =
+              payload.total ?? (payload.items || []).length;
+          } catch (error) {
+            container.innerHTML =
+              '<p class="empty-state">We could not load recommendations right now.</p>';
+            showToast(
+              error.message || "Unable to load recommendations.",
+              "error"
+            );
+            resultsCountEl.textContent = "0";
+          } finally {
+            isLoading = false;
+            updateBulkButtons();
+          }
+        }
+
+        form.addEventListener("submit", (event) => {
+          event.preventDefault();
+          loadRecommendations();
+        });
+
+        document
+          .getElementById("reset-filters")
+          .addEventListener("click", () => {
+            form.reset();
+            loadRecommendations();
+          });
+
+        selectAllCheckbox.addEventListener("change", () => {
+          const checkboxes = container.querySelectorAll(
+            '.recommendation-card input[type="checkbox"]'
+          );
+          checkboxes.forEach((checkbox) => {
+            checkbox.checked = selectAllCheckbox.checked;
+          });
+          updateBulkButtons();
+        });
+
+        container.addEventListener("change", (event) => {
+          if (
+            event.target.matches('.recommendation-card input[type="checkbox"]')
+          ) {
+            updateBulkButtons();
+          }
+        });
+
+        container.addEventListener("click", async (event) => {
+          const actionBtn = event.target.closest("button[data-action]");
+          if (!actionBtn) {
+            return;
+          }
+          const card = actionBtn.closest(".recommendation-card");
+          if (!card) {
+            return;
+          }
+          const id = Number(card.dataset.id);
+          const action = actionBtn.dataset.action;
+
+          if (action === "approve") {
+            await performBulkAction(approveUrl, [id]);
+          } else if (action === "reject") {
+            await performBulkAction(rejectUrl, [id]);
+          } else if (action === "edit") {
+            const currentRationale =
+              card.querySelector(".rationale")?.textContent || "";
+            const updated = window.prompt(
+              "Update rationale:",
+              currentRationale
+            );
+            if (updated === null) {
+              return;
+            }
+            const trimmed = updated.trim();
+            if (!trimmed) {
+              showToast("Rationale cannot be empty.", "error");
+              return;
+            }
+            await performEdit(id, trimmed);
+          } else if (action === "pin") {
+            const isPinned = card.dataset.pinned === "true";
+            await performPin(id, !isPinned);
+          }
+        });
+
+        bulkApproveBtn.addEventListener("click", () => {
+          const ids = getSelectedIds();
+          if (ids.length === 0) {
+            return;
+          }
+          performBulkAction(approveUrl, ids);
+        });
+
+        bulkRejectBtn.addEventListener("click", () => {
+          const ids = getSelectedIds();
+          if (ids.length === 0) {
+            return;
+          }
+          performBulkAction(rejectUrl, ids);
+        });
+
+        loadRecommendations();
+      })();
+    </script>
+  </body>
+</html>

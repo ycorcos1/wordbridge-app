@@ -1,0 +1,32 @@
+[
+  {
+    "word": "analyze",
+    "definition": "Examine something in detail to understand it better or draw conclusions.",
+    "difficulty": 3,
+    "grade_level": 6
+  },
+  {
+    "word": "context",
+    "definition": "The circumstances or background that help explain an event, idea, or statement.",
+    "difficulty": 3,
+    "grade_level": 6
+  },
+  {
+    "word": "summarize",
+    "definition": "Give a brief statement of the main points of something.",
+    "difficulty": 4,
+    "grade_level": 6
+  },
+  {
+    "word": "structure",
+    "definition": "The way that parts of something are arranged or put together.",
+    "difficulty": 3,
+    "grade_level": 6
+  },
+  {
+    "word": "infer",
+    "definition": "Draw a conclusion using evidence and reasoning rather than explicit statements.",
+    "difficulty": 4,
+    "grade_level": 6
+  }
+]

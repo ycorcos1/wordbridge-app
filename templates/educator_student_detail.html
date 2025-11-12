@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>WordBridge – Student Overview</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f5f7fa;
+        margin: 0;
+        padding: 32px;
+        color: #1e1e1e;
+      }
+      header {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 32px;
+      }
+      h1 {
+        color: #1c3d5a;
+        margin: 0;
+      }
+      nav {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      a.button {
+        padding: 10px 16px;
+        border-radius: 6px;
+        background-color: #4da1ff;
+        color: #ffffff;
+        text-decoration: none;
+        font-weight: 600;
+        transition: background-color 0.2s ease;
+      }
+      a.button:hover {
+        background-color: #3b83d1;
+      }
+      .card {
+        background-color: #ffffff;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
+        margin-bottom: 24px;
+      }
+      .card h2 {
+        margin-top: 0;
+        color: #1c3d5a;
+      }
+      .details-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 16px;
+        margin-top: 16px;
+      }
+      .detail {
+        padding: 16px;
+        border-radius: 10px;
+        background-color: #f0f4f9;
+      }
+      .detail span {
+        display: block;
+      }
+      .detail .label {
+        font-size: 13px;
+        text-transform: uppercase;
+        color: #5a6b7d;
+        letter-spacing: 0.5px;
+        margin-bottom: 6px;
+      }
+      .detail .value {
+        font-size: 18px;
+        font-weight: 600;
+        color: #1c3d5a;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 16px;
+      }
+      .link-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 10px 16px;
+        border-radius: 6px;
+        border: 1px solid #4da1ff;
+        color: #1c3d5a;
+        font-weight: 600;
+        text-decoration: none;
+        transition: background-color 0.2s ease, color 0.2s ease;
+      }
+      .link-button:hover {
+        background-color: #4da1ff;
+        color: #ffffff;
+      }
+      .uploads-section {
+        margin-top: 24px;
+      }
+      .uploads-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 16px;
+      }
+      .uploads-table th,
+      .uploads-table td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid #e0e0e0;
+      }
+      .uploads-table th {
+        background-color: #f5f7fa;
+        font-weight: 600;
+        color: #1c3d5a;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .uploads-table td {
+        font-size: 14px;
+        color: #1e1e1e;
+      }
+      .uploads-table tr:hover {
+        background-color: #f9fafb;
+      }
+      .status-badge {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+      }
+      .status-pending {
+        background-color: #fff3cd;
+        color: #856404;
+      }
+      .status-processing {
+        background-color: #cfe2ff;
+        color: #084298;
+      }
+      .status-completed {
+        background-color: #d1e7dd;
+        color: #0f5132;
+      }
+      .status-failed {
+        background-color: #f8d7da;
+        color: #842029;
+      }
+      .delete-button {
+        background-color: #dc3545;
+        color: #ffffff;
+        border: none;
+        padding: 6px 12px;
+        border-radius: 4px;
+        font-size: 13px;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+      }
+      .delete-button:hover {
+        background-color: #bb2d3b;
+      }
+      .delete-button:disabled {
+        background-color: #ccc;
+        cursor: not-allowed;
+      }
+      .empty-state {
+        text-align: center;
+        padding: 32px;
+        color: #888;
+      }
+      .recommendations-section {
+        margin-top: 16px;
+      }
+      .recommendations-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 20px;
+      }
+      .recommendation-card {
+        background-color: #ffffff;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
+        border: 1px solid transparent;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .recommendation-card.pinned {
+        border-color: #4da1ff;
+      }
+      .recommendation-card h3 {
+        font-size: 20px;
+        margin: 0;
+        color: #1c3d5a;
+      }
+      .recommendation-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        font-size: 13px;
+        color: #5a6b7d;
+      }
+      .recommendation-status {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+      }
+      .recommendation-status.pending {
+        background-color: #fff3cd;
+        color: #856404;
+      }
+      .recommendation-status.approved {
+        background-color: #d1e7dd;
+        color: #0f5132;
+      }
+      .recommendation-status.rejected {
+        background-color: #f8d7da;
+        color: #842029;
+      }
+      .recommendation-content {
+        font-size: 14px;
+        line-height: 1.6;
+        color: #1e1e1e;
+      }
+      .recommendation-content strong {
+        color: #1c3d5a;
+      }
+      .recommendation-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 8px;
+      }
+      .recommendation-actions button {
+        padding: 8px 12px;
+        border-radius: 6px;
+        border: 1px solid #4da1ff;
+        background-color: #ffffff;
+        color: #1c3d5a;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color 0.2s ease, color 0.2s ease;
+        font-size: 13px;
+      }
+      .recommendation-actions button:hover {
+        background-color: #4da1ff;
+        color: #ffffff;
+      }
+      .recommendation-actions button.approve-btn {
+        background-color: #4da1ff;
+        color: #ffffff;
+      }
+      .recommendation-actions button.approve-btn:hover {
+        background-color: #3b83d1;
+      }
+      .recommendation-actions button.reject-btn {
+        border-color: #dc3545;
+        color: #dc3545;
+      }
+      .recommendation-actions button.reject-btn:hover {
+        background-color: #dc3545;
+        color: #ffffff;
+      }
+      .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+      }
+      .modal-overlay.active {
+        display: flex;
+      }
+      .modal {
+        background-color: #ffffff;
+        border-radius: 12px;
+        padding: 24px;
+        max-width: 480px;
+        width: 90%;
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+      }
+      .modal h3 {
+        margin: 0 0 16px 0;
+        color: #1c3d5a;
+        font-size: 20px;
+      }
+      .modal p {
+        margin: 0 0 24px 0;
+        color: #1e1e1e;
+        line-height: 1.5;
+      }
+      .modal-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+      }
+      .modal-button {
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        transition: background-color 0.2s ease;
+      }
+      .modal-button-cancel {
+        background-color: #f5f7fa;
+        color: #1e1e1e;
+      }
+      .modal-button-cancel:hover {
+        background-color: #e0e0e0;
+      }
+      .modal-button-delete {
+        background-color: #dc3545;
+        color: #ffffff;
+      }
+      .modal-button-delete:hover {
+        background-color: #bb2d3b;
+      }
+      @media (max-width: 768px) {
+        body {
+          padding: 24px 16px;
+        }
+        .uploads-table {
+          font-size: 12px;
+        }
+        .uploads-table th,
+        .uploads-table td {
+          padding: 8px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <h1>{{ overview.name }}</h1>
+        <p>Student profile overview</p>
+      </div>
+      <nav>
+        <a class="button" href="{{ url_for('core.educator_dashboard') }}"
+          >Dashboard</a
+        >
+        <a class="button" href="{{ url_for('core.educator_upload_page') }}"
+          >Upload Work</a
+        >
+        <a class="button" href="{{ url_for('core.logout') }}">Log Out</a>
+      </nav>
+    </header>
+    <section class="card">
+      <h2>Student Snapshot</h2>
+      <div class="details-grid">
+        <div class="detail">
+          <span class="label">Email</span>
+          <span class="value">{{ overview.email }}</span>
+        </div>
+        <div class="detail">
+          <span class="label">Grade</span>
+          <span class="value">{{ overview.grade_level }}</span>
+        </div>
+        <div class="detail">
+          <span class="label">Class</span>
+          <span class="value">{{ overview.class_number }}</span>
+        </div>
+        <div class="detail">
+          <span class="label">Vocabulary Level</span>
+          <span class="value">{{ overview.vocabulary_level }}</span>
+        </div>
+        <div class="detail">
+          <span class="label">Last Analyzed</span>
+          <span class="value">
+            {% if overview.last_analyzed_at %} {{ overview.last_analyzed_at.strftime('%Y-%m-%d %H:%M') }}
+            {% else %} Not yet analyzed {% endif %}
+          </span>
+        </div>
+        <div class="detail">
+          <span class="label">Last Upload</span>
+          <span class="value">
+            {% if overview.last_upload_at %} {{ overview.last_upload_at.strftime('%Y-%m-%d %H:%M') }}
+            {% else %} No uploads recorded {% endif %}
+          </span>
+        </div>
+      </div>
+    </section>
+    <section class="card">
+      <h2>Recommendations Summary</h2>
+      <div class="details-grid">
+        <div class="detail">
+          <span class="label">Pending</span>
+          <span class="value">{{ overview.pending_words }}</span>
+        </div>
+        <div class="detail">
+          <span class="label">Approved</span>
+          <span class="value">{{ overview.approved_words }}</span>
+        </div>
+        <div class="detail">
+          <span class="label">Rejected</span>
+          <span class="value">{{ overview.rejected_words }}</span>
+        </div>
+      </div>
+      <div class="actions">
+        <a
+          class="link-button"
+          href="{{ url_for('core.educator_upload_page', student_id=overview.student_id) }}"
+          >Upload New Work</a
+        >
+        <a class="link-button" href="{{ url_for('core.educator_dashboard') }}"
+          >Back to Dashboard</a
+        >
+      </div>
+    </section>
+    <section class="card">
+      <h2>Uploads</h2>
+      <div class="uploads-section">
+        {% if uploads %}
+        <table class="uploads-table">
+          <thead>
+            <tr>
+              <th>Filename</th>
+              <th>Status</th>
+              <th>Uploaded</th>
+              <th>Processed</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for upload in uploads %}
+            <tr data-upload-id="{{ upload.id }}">
+              <td>{{ upload.filename }}</td>
+              <td>
+                <span class="status-badge status-{{ upload.status }}">
+                  {{ upload.status }}
+                </span>
+              </td>
+              <td>
+                {% if upload.created_at %} {{ upload.created_at.strftime('%Y-%m-%d %H:%M') }} {% else %}
+                N/A {% endif %}
+              </td>
+              <td>
+                {% if upload.processed_at %} {{ upload.processed_at.strftime('%Y-%m-%d %H:%M') }} {% else
+                %} Not processed {% endif %}
+              </td>
+              <td>
+                <button
+                  class="delete-button"
+                  data-student-id="{{ overview.student_id }}"
+                  data-upload-id="{{ upload.id }}"
+                  data-filename="{{ upload.filename }}"
+                >
+                  Delete
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+          <p>No uploads yet. Upload student work to get started.</p>
+        </div>
+        {% endif %}
+      </div>
+    </section>
+    
+    <section class="card">
+      <h2>Vocabulary Recommendations</h2>
+      <div class="recommendations-section">
+        {% if recommendations %}
+        <div class="recommendations-grid">
+          {% for rec in recommendations %}
+          <div class="recommendation-card {% if rec.pinned %}pinned{% endif %}" data-recommendation-id="{{ rec.id }}">
+            <h3>{{ rec.word }}</h3>
+            <div class="recommendation-meta">
+              <span class="recommendation-status {{ rec.status }}">{{ rec.status }}</span>
+              <span>Difficulty: {{ rec.difficulty_score }}/10</span>
+              {% if rec.created_at %}
+              <span>Added: {{ rec.created_at.strftime('%m/%d/%Y') if rec.created_at else '' }}</span>
+              {% endif %}
+            </div>
+            <div class="recommendation-content">
+              <p><strong>Definition:</strong> {{ rec.definition or 'No definition available.' }}</p>
+              <p><strong>Rationale:</strong> {{ rec.rationale or 'No rationale provided.' }}</p>
+              {% if rec.example_sentence %}
+              <p><strong>Example:</strong> {{ rec.example_sentence }}</p>
+              {% endif %}
+            </div>
+            <div class="recommendation-actions">
+              {% if rec.status == 'pending' %}
+              <button class="approve-btn" data-action="approve" data-rec-id="{{ rec.id }}">Approve</button>
+              <button class="reject-btn" data-action="reject" data-rec-id="{{ rec.id }}">Reject</button>
+              {% elif rec.status == 'approved' %}
+              <button class="reject-btn" data-action="reject" data-rec-id="{{ rec.id }}">Remove</button>
+              {% elif rec.status == 'rejected' %}
+              <button class="approve-btn" data-action="approve" data-rec-id="{{ rec.id }}">Approve</button>
+              {% endif %}
+              <button data-action="edit" data-rec-id="{{ rec.id }}" data-rationale="{{ rec.rationale|replace("'", "&#39;")|replace('"', '&quot;') }}">Edit Rationale</button>
+              <button data-action="pin" data-rec-id="{{ rec.id }}" data-pinned="{{ 'true' if rec.pinned else 'false' }}">
+                {{ 'Unpin' if rec.pinned else 'Pin' }}
+              </button>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+          <p>No recommendations yet. Upload student work to generate vocabulary recommendations.</p>
+        </div>
+        {% endif %}
+      </div>
+    </section>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="delete-modal" class="modal-overlay">
+      <div class="modal">
+        <h3>Delete Upload</h3>
+        <p id="delete-modal-message"></p>
+        <div class="modal-actions">
+          <button
+            class="modal-button modal-button-cancel"
+            id="delete-modal-cancel"
+          >
+            Cancel
+          </button>
+          <button
+            class="modal-button modal-button-delete"
+            id="delete-modal-confirm"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Error Modal -->
+    <div id="error-modal" class="modal-overlay">
+      <div class="modal">
+        <h3>Error</h3>
+        <p id="error-modal-message"></p>
+        <div class="modal-actions">
+          <button
+            class="modal-button modal-button-cancel"
+            id="error-modal-ok"
+            style="width: 100%;"
+          >
+            OK
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Prompt Modal (for editing rationale) -->
+    <div id="prompt-modal" class="modal-overlay">
+      <div class="modal">
+        <h3 id="prompt-modal-title">Edit Rationale</h3>
+        <p id="prompt-modal-message"></p>
+        <textarea
+          id="prompt-modal-input"
+          style="width: 100%; min-height: 100px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-family: inherit; font-size: 14px; margin-bottom: 16px; resize: vertical;"
+        ></textarea>
+        <div class="modal-actions">
+          <button
+            class="modal-button modal-button-cancel"
+            id="prompt-modal-cancel"
+          >
+            Cancel
+          </button>
+          <button
+            class="modal-button"
+            id="prompt-modal-confirm"
+            style="background-color: #4da1ff; color: #ffffff;"
+          >
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        const modal = document.getElementById("delete-modal");
+        const modalMessage = document.getElementById("delete-modal-message");
+        const modalCancel = document.getElementById("delete-modal-cancel");
+        const modalConfirm = document.getElementById("delete-modal-confirm");
+
+        let currentButton = null;
+        let currentStudentId = null;
+        let currentUploadId = null;
+
+        // Close modal function
+        function closeModal() {
+          modal.classList.remove("active");
+          currentButton = null;
+          currentStudentId = null;
+          currentUploadId = null;
+        }
+
+        // Cancel button
+        modalCancel.addEventListener("click", closeModal);
+
+        // Click outside modal to close
+        modal.addEventListener("click", function (e) {
+          if (e.target === modal) {
+            closeModal();
+          }
+        });
+
+        // Confirm delete
+        modalConfirm.addEventListener("click", function () {
+          if (!currentButton || !currentStudentId || !currentUploadId) {
+            return;
+          }
+
+          const originalText = currentButton.textContent;
+          currentButton.disabled = true;
+          currentButton.textContent = "Deleting...";
+          modalConfirm.disabled = true;
+          modalConfirm.textContent = "Deleting...";
+
+          fetch(
+            `/api/educator/students/${currentStudentId}/uploads/${currentUploadId}`,
+            {
+              method: "DELETE",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              credentials: "include",
+            }
+          )
+            .then((response) => {
+              if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+              }
+              return response.json();
+            })
+            .then((data) => {
+              if (data.success) {
+                // Store references before closing modal
+                const uploadIdToRemove = currentUploadId;
+                const buttonToReset = currentButton;
+
+                // Reset button state
+                if (buttonToReset) {
+                  buttonToReset.disabled = false;
+                  buttonToReset.textContent = "Delete";
+                }
+                modalConfirm.disabled = false;
+                modalConfirm.textContent = "Delete";
+
+                closeModal();
+
+                // Remove the row from the table - try multiple selector approaches
+                let row = document.querySelector(
+                  `tr[data-upload-id="${uploadIdToRemove}"]`
+                );
+
+                // If not found, try finding by the button's parent row
+                if (!row && buttonToReset) {
+                  row = buttonToReset.closest("tr");
+                }
+
+                if (row) {
+                  // Fade out animation
+                  row.style.transition = "opacity 0.2s ease";
+                  row.style.opacity = "0";
+
+                  // Remove after fade out
+                  setTimeout(function () {
+                    row.remove();
+
+                    // Check if table is now empty
+                    const tbody = document.querySelector(
+                      ".uploads-table tbody"
+                    );
+                    if (tbody && tbody.children.length === 0) {
+                      // Replace table with empty state
+                      const uploadsSection =
+                        document.querySelector(".uploads-section");
+                      const table = document.querySelector(".uploads-table");
+                      if (uploadsSection && table) {
+                        table.remove();
+                        uploadsSection.innerHTML =
+                          '<div class="empty-state"><p>No uploads yet. Upload student work to get started.</p></div>';
+                      }
+                    }
+                  }, 200);
+                } else {
+                  // Row not found, reload page to ensure consistency
+                  console.warn(
+                    "Row not found for upload ID:",
+                    uploadIdToRemove
+                  );
+                  location.reload();
+                }
+              } else {
+                showError("Error: " + (data.error || "Failed to delete upload"));
+                currentButton.disabled = false;
+                currentButton.textContent = originalText;
+                modalConfirm.disabled = false;
+                modalConfirm.textContent = "Delete";
+                closeModal();
+              }
+            })
+            .catch((error) => {
+              showError("Error: " + error.message);
+              currentButton.disabled = false;
+              currentButton.textContent = originalText;
+              modalConfirm.disabled = false;
+              modalConfirm.textContent = "Delete";
+              closeModal();
+            });
+        });
+
+        // Add event listeners to all delete buttons
+        const deleteButtons = document.querySelectorAll(".delete-button");
+        deleteButtons.forEach(function (button) {
+          button.addEventListener("click", function () {
+            const studentId = button.getAttribute("data-student-id");
+            const uploadId = button.getAttribute("data-upload-id");
+            const filename = button.getAttribute("data-filename");
+
+            currentButton = button;
+            currentStudentId = studentId;
+            currentUploadId = uploadId;
+
+            modalMessage.textContent =
+              'Are you sure you want to delete "' +
+              filename +
+              '"?\n\n' +
+              "This will also delete all recommendations associated with this upload.";
+
+            modalConfirm.disabled = false;
+            modalConfirm.textContent = "Delete";
+            modal.classList.add("active");
+          });
+        });
+      });
+
+      // Error Modal Functions
+      const errorModal = document.getElementById("error-modal");
+      const errorModalMessage = document.getElementById("error-modal-message");
+      const errorModalOk = document.getElementById("error-modal-ok");
+
+      function showError(message) {
+        errorModalMessage.textContent = message;
+        errorModal.classList.add("active");
+      }
+
+      errorModalOk.addEventListener("click", function () {
+        errorModal.classList.remove("active");
+      });
+
+      errorModal.addEventListener("click", function (e) {
+        if (e.target === errorModal) {
+          errorModal.classList.remove("active");
+        }
+      });
+
+      // Prompt Modal Functions
+      const promptModal = document.getElementById("prompt-modal");
+      const promptModalTitle = document.getElementById("prompt-modal-title");
+      const promptModalMessage = document.getElementById("prompt-modal-message");
+      const promptModalInput = document.getElementById("prompt-modal-input");
+      const promptModalCancel = document.getElementById("prompt-modal-cancel");
+      const promptModalConfirm = document.getElementById("prompt-modal-confirm");
+
+      let promptResolve = null;
+
+      function showPrompt(title, message, defaultValue) {
+        return new Promise((resolve) => {
+          promptResolve = resolve;
+          promptModalTitle.textContent = title;
+          promptModalMessage.textContent = message || "";
+          promptModalInput.value = defaultValue || "";
+          promptModal.classList.add("active");
+          promptModalInput.focus();
+        });
+      }
+
+      promptModalCancel.addEventListener("click", function () {
+        promptModal.classList.remove("active");
+        if (promptResolve) {
+          promptResolve(null);
+          promptResolve = null;
+        }
+      });
+
+      promptModalConfirm.addEventListener("click", function () {
+        const value = promptModalInput.value.trim();
+        promptModal.classList.remove("active");
+        if (promptResolve) {
+          promptResolve(value);
+          promptResolve = null;
+        }
+      });
+
+      promptModal.addEventListener("click", function (e) {
+        if (e.target === promptModal) {
+          promptModal.classList.remove("active");
+          if (promptResolve) {
+            promptResolve(null);
+            promptResolve = null;
+          }
+        }
+      });
+
+      // Allow Enter key to confirm in prompt modal
+      promptModalInput.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" && e.ctrlKey) {
+          e.preventDefault();
+          promptModalConfirm.click();
+        }
+      });
+
+      // Recommendations functions
+      function approveRecommendation(id) {
+        fetch("{{ url_for('core.api_recommendations_approve') }}", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ ids: [id] }),
+        })
+          .then((r) => {
+            if (!r.ok) {
+              throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+            }
+            return r.json();
+          })
+          .then((data) => {
+            if (data.error) {
+              showError("Error: " + data.error);
+            } else if (data.updated !== undefined) {
+              location.reload();
+            } else {
+              showError("Error: Failed to approve");
+            }
+          })
+          .catch((e) => showError("Error: " + e.message));
+      }
+
+      function rejectRecommendation(id) {
+        fetch("{{ url_for('core.api_recommendations_reject') }}", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ ids: [id] }),
+        })
+          .then((r) => {
+            if (!r.ok) {
+              throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+            }
+            return r.json();
+          })
+          .then((data) => {
+            if (data.error) {
+              showError("Error: " + data.error);
+            } else if (data.updated !== undefined) {
+              location.reload();
+            } else {
+              showError("Error: Failed to reject");
+            }
+          })
+          .catch((e) => showError("Error: " + e.message));
+      }
+
+      async function editRationale(id, currentRationale) {
+        const newRationale = await showPrompt("Edit Rationale", "Enter the new rationale:", currentRationale);
+        if (newRationale === null || newRationale === "") return;
+        fetch("{{ url_for('core.api_recommendations_edit') }}", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ id: id, rationale: newRationale }),
+        })
+          .then((r) => {
+            if (!r.ok) {
+              throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+            }
+            return r.json();
+          })
+          .then((data) => {
+            if (data.error) {
+              showError("Error: " + data.error);
+            } else if (data.updated !== undefined) {
+              location.reload();
+            } else {
+              showError("Error: Failed to update");
+            }
+          })
+          .catch((e) => showError("Error: " + e.message));
+      }
+
+      function togglePin(id, isPinned) {
+        fetch("{{ url_for('core.api_recommendations_pin') }}", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ id: id, pinned: !isPinned }),
+        })
+          .then((r) => {
+            if (!r.ok) {
+              throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+            }
+            return r.json();
+          })
+          .then((data) => {
+            if (data.error) {
+              showError("Error: " + data.error);
+            } else if (data.updated !== undefined) {
+              location.reload();
+            } else {
+              showError("Error: Failed to toggle pin");
+            }
+          })
+          .catch((e) => showError("Error: " + e.message));
+      }
+
+      // Event delegation for recommendation action buttons
+      document.addEventListener("click", function(e) {
+        const button = e.target.closest("[data-action]");
+        if (!button) return;
+        
+        const action = button.getAttribute("data-action");
+        const recId = parseInt(button.getAttribute("data-rec-id"));
+        
+        if (action === "approve") {
+          approveRecommendation(recId);
+        } else if (action === "reject") {
+          rejectRecommendation(recId);
+        } else if (action === "edit") {
+          const rationale = button.getAttribute("data-rationale") || "";
+          editRationale(recId, rationale);
+        } else if (action === "pin") {
+          const isPinned = button.getAttribute("data-pinned") === "true";
+          togglePin(recId, isPinned);
+        }
+      });
+    </script>
+  </body>
+</html>

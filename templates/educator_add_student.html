@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>WordBridge – Add Student</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f5f7fa;
+        margin: 0;
+        padding: 32px;
+        color: #1e1e1e;
+      }
+      header {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 24px;
+      }
+      h1 {
+        color: #1c3d5a;
+        margin: 0;
+        font-size: 28px;
+      }
+      header p {
+        margin: 4px 0 0;
+        font-size: 14px;
+        color: #334e68;
+      }
+      nav {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      a.button,
+      button.primary {
+        padding: 10px 16px;
+        border-radius: 6px;
+        background-color: #4da1ff;
+        color: #ffffff;
+        text-decoration: none;
+        font-weight: 600;
+        transition: background-color 0.2s ease;
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      a.button:hover,
+      button.primary:hover {
+        background-color: #3b83d1;
+      }
+      main {
+        max-width: 720px;
+        margin: 0 auto;
+      }
+      .card {
+        background-color: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
+        padding: 32px;
+      }
+      form {
+        display: grid;
+        gap: 18px;
+      }
+      label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 6px;
+      }
+      input,
+      select {
+        width: 100%;
+        padding: 12px;
+        border-radius: 6px;
+        border: 1px solid #d0d0d0;
+        font-size: 15px;
+        box-sizing: border-box;
+      }
+      .field-group {
+        display: flex;
+        flex-direction: column;
+      }
+      .error {
+        color: #e74c3c;
+        font-size: 13px;
+        margin-top: 6px;
+      }
+      .hint {
+        color: #5a6b7d;
+        font-size: 12px;
+        margin-top: 4px;
+      }
+      .messages {
+        margin: 0 0 20px;
+        padding: 0;
+        list-style: none;
+      }
+      .messages li {
+        padding: 12px 16px;
+        border-radius: 6px;
+        margin-bottom: 10px;
+        font-size: 14px;
+      }
+      .messages li.success {
+        background-color: #eaf9f0;
+        color: #1e7a3b;
+      }
+      .messages li.error {
+        background-color: #fdecea;
+        color: #b03a2e;
+      }
+      .success-actions {
+        display: flex;
+        gap: 16px;
+        margin-top: 24px;
+      }
+      .form-actions {
+        display: flex;
+        justify-content: flex-end;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <h1>Add a New Student</h1>
+        <p>Provide student details to create their WordBridge account.</p>
+      </div>
+      <nav>
+        <a class="button" href="{{ url_for('core.educator_dashboard') }}"
+          >Dashboard</a
+        >
+        <a class="button" href="{{ url_for('core.educator_add_student') }}"
+          >Add Student</a
+        >
+        <a class="button" href="{{ url_for('core.educator_upload_page') }}"
+          >Upload Work</a
+        >
+        <a class="button" href="{{ url_for('core.logout') }}">Log Out</a>
+      </nav>
+    </header>
+
+    <main>
+      {% with messages = get_flashed_messages(with_categories=True) %}
+        {% if messages %}
+          <ul class="messages">
+            {% for category, message in messages %}
+              <li class="{{ category }}">{{ message }}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      {% endwith %}
+
+      {% if success and new_student %}
+        <section class="card">
+          <h2>Student account created successfully!</h2>
+          <p>
+            {{ new_student.name }} ({{ new_student.username }}) is now ready to
+            receive baseline vocabulary for grade {{ form_data.grade }}.
+          </p>
+          <div class="success-actions">
+            <a class="button primary" href="{{ url_for('core.educator_add_student') }}"
+              >Create Another Student</a
+            >
+            <a class="button secondary" href="{{ url_for('core.educator_dashboard') }}"
+              >Return to Dashboard</a
+            >
+          </div>
+        </section>
+      {% else %}
+        <section class="card" aria-labelledby="add-student-heading">
+          <h2 id="add-student-heading">Student Details</h2>
+          {% if errors.get("form") %}
+            <p class="error" role="alert">{{ errors["form"] }}</p>
+          {% endif %}
+          <form method="post">
+            <div class="field-group">
+              <label for="name">Student Name</label>
+              <input
+                id="name"
+                name="name"
+                type="text"
+                value="{{ form_data.name }}"
+                autocomplete="name"
+                required
+              />
+              {% if errors.get("name") %}
+                <span class="error">{{ errors["name"] }}</span>
+              {% endif %}
+            </div>
+            <div class="field-group">
+              <label for="grade">Grade Level</label>
+              <select id="grade" name="grade" required>
+                <option value="6" {% if form_data.grade == "6" or not form_data.grade %}selected{% endif %}>
+                  6th Grade
+                </option>
+                <option value="7" {% if form_data.grade == "7" %}selected{% endif %}>
+                  7th Grade
+                </option>
+                <option value="8" {% if form_data.grade == "8" %}selected{% endif %}>
+                  8th Grade
+                </option>
+              </select>
+              {% if errors.get("grade") %}
+                <span class="error">{{ errors["grade"] }}</span>
+              {% endif %}
+            </div>
+            <div class="field-group">
+              <label for="class_number">Class Number</label>
+              <input
+                id="class_number"
+                name="class_number"
+                type="number"
+                min="601"
+                max="899"
+                step="1"
+                value="{{ form_data.class_number }}"
+                placeholder="e.g., 601, 602, 701"
+                required
+              />
+              {% if errors.get("class_number") %}
+                <span class="error">{{ errors["class_number"] }}</span>
+              {% endif %}
+              <span class="hint">
+                Use a three-digit code where the first digit matches the grade
+                (e.g., 601, 602 for 6th grade; 701, 702 for 7th grade).
+              </span>
+            </div>
+            <div class="field-group">
+              <label for="username">Username</label>
+              <input
+                id="username"
+                name="username"
+                type="text"
+                value="{{ form_data.username }}"
+                autocomplete="username"
+                required
+              />
+              {% if errors.get("username") %}
+                <span class="error">{{ errors["username"] }}</span>
+              {% endif %}
+            </div>
+            <div class="field-group">
+              <label for="email">Email</label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                value="{{ form_data.email }}"
+                autocomplete="email"
+                required
+              />
+              {% if errors.get("email") %}
+                <span class="error">{{ errors["email"] }}</span>
+              {% endif %}
+            </div>
+            <div class="field-group">
+              <label for="password">Temporary Password</label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autocomplete="new-password"
+                required
+              />
+              {% if errors.get("password") %}
+                <span class="error">{{ errors["password"] }}</span>
+              {% endif %}
+            </div>
+            <div class="form-actions">
+              <button class="primary" type="submit">Create Student Account</button>
+            </div>
+          </form>
+        </section>
+      {% endif %}
+    </main>
+    <script>
+      (function () {
+        const gradeSelect = document.getElementById("grade");
+        const classNumberInput = document.getElementById("class_number");
+        if (!gradeSelect || !classNumberInput) {
+          return;
+        }
+
+        function updateClassNumberBounds() {
+          const grade = parseInt(gradeSelect.value, 10);
+          if (!Number.isInteger(grade)) {
+            return;
+          }
+          const min = grade * 100 + 1;
+          const max = grade * 100 + 99;
+          classNumberInput.min = String(min);
+          classNumberInput.max = String(max);
+
+          const current = parseInt(classNumberInput.value, 10);
+          if (!Number.isInteger(current) || current < min || current > max) {
+            classNumberInput.value = String(min);
+          }
+        }
+
+        updateClassNumberBounds();
+        gradeSelect.addEventListener("change", updateClassNumberBounds);
+      })();
+    </script>
+  </body>
+</html>
+
