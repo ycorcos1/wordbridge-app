@@ -277,46 +277,82 @@ def process_upload_job(
 
 
 def _recover_stuck_uploads() -> None:
-    """Check for pending uploads that are older than 2 minutes and enqueue them."""
+    """Check for pending or processing uploads that are stuck and re-enqueue them."""
     try:
-        from models import get_connection
-        import models
+        # CRITICAL: Reset connection to ensure we're using PostgreSQL
+        from models import reset_engine, get_connection
+        reset_engine()
+        
         from app.jobs.queue import enqueue_upload_job
+        from models import update_upload_status
         
         conn = get_connection()
         cur = conn.cursor()
         
-        # Find pending uploads older than 2 minutes
-        # Check backend by trying to detect connection type
         from models import _backend
         is_sqlite = _backend == "sqlite" if _backend else 'sqlite3' in str(type(conn))
-        if is_sqlite:
-            cur.execute("""
-                SELECT id FROM uploads 
-                WHERE status = 'pending' 
-                AND datetime(created_at) < datetime('now', '-2 minutes')
-                ORDER BY created_at ASC
-                LIMIT 10
-            """)
-        else:
-            # PostgreSQL
-            cur.execute("""
-                SELECT id FROM uploads 
-                WHERE status = 'pending' 
-                AND created_at < NOW() - INTERVAL '2 minutes'
-                ORDER BY created_at ASC
-                LIMIT 10
-            """)
         
-        rows = cur.fetchall()
-        if rows:
-            stuck_count = len(rows)
-            logger.info(f"Found {stuck_count} stuck pending upload(s), re-enqueueing...")
-            for row in rows:
-                upload_id = row[0] if isinstance(row, (list, tuple)) else row.get("id")
+        # Log which database we're checking
+        logger.debug(f"Recovering stuck uploads from {_backend if _backend else 'unknown'} database")
+        
+        all_stuck = []
+        
+        if is_sqlite:
+            # Check for ALL pending uploads (not just old ones - catch immediately if not enqueued)
+            cur.execute("""
+                SELECT id FROM uploads 
+                WHERE status = 'pending'
+                ORDER BY created_at ASC
+                LIMIT 20
+            """)
+            pending_rows = cur.fetchall()
+            
+            # Check for stuck processing uploads (older than 10 minutes)
+            cur.execute("""
+                SELECT id FROM uploads 
+                WHERE status = 'processing' 
+                AND datetime(created_at) < datetime('now', '-10 minutes')
+                ORDER BY created_at ASC
+                LIMIT 10
+            """)
+            processing_rows = cur.fetchall()
+        else:
+            # PostgreSQL - check for ALL pending uploads (not just old ones)
+            cur.execute("""
+                SELECT id FROM uploads 
+                WHERE status = 'pending'
+                ORDER BY created_at ASC
+                LIMIT 20
+            """)
+            pending_rows = cur.fetchall()
+            
+            # PostgreSQL - processing uploads (older than 10 minutes)
+            cur.execute("""
+                SELECT id FROM uploads 
+                WHERE status = 'processing' 
+                AND created_at < NOW() - INTERVAL '10 minutes'
+                ORDER BY created_at ASC
+                LIMIT 10
+            """)
+            processing_rows = cur.fetchall()
+        
+        # Collect all stuck uploads
+        for row in pending_rows:
+            upload_id = row[0] if isinstance(row, (list, tuple)) else row.get("id")
+            all_stuck.append(("pending", upload_id))
+        
+        for row in processing_rows:
+            upload_id = row[0] if isinstance(row, (list, tuple)) else row.get("id")
+            all_stuck.append(("processing", upload_id))
+        
+        if all_stuck:
+            logger.info(f"Found {len(all_stuck)} stuck upload(s), re-enqueueing...")
+            for status, upload_id in all_stuck:
                 try:
+                    # Reset status to pending before re-enqueueing
+                    update_upload_status(int(upload_id), "pending")
                     enqueue_upload_job(int(upload_id))
-                    logger.info(f"Re-enqueued stuck upload {upload_id}")
+                    logger.info(f"Re-enqueued stuck {status} upload {upload_id}")
                 except Exception as e:
                     logger.warning(f"Failed to re-enqueue upload {upload_id}: {e}")
         
@@ -339,10 +375,10 @@ def run_worker_loop(stop_after: Optional[int] = None) -> None:
     logger.info("Checking for stuck pending uploads on startup...")
     _recover_stuck_uploads()
     
-    # Check for stuck uploads every 5 minutes
+    # Check for stuck uploads every 1 minute (more aggressive to catch issues faster)
     import time
     last_recovery_check = time.time()
-    recovery_interval = 300  # 5 minutes
+    recovery_interval = 60  # 1 minute
 
     while True:
         job = dequeue_upload_job(timeout=settings.JOB_POLL_INTERVAL_SECONDS)
@@ -359,12 +395,23 @@ def run_worker_loop(stop_after: Optional[int] = None) -> None:
 
         upload_id = int(job["upload_id"])
         logger.info(f"Processing upload job {upload_id}...")
-        result = process_upload_job(upload_id)
-        if result.success:
-            logger.info(f"Successfully processed upload {upload_id}")
-        else:
-            logger.warning(f"Failed to process upload {upload_id}: {result.error}")
-        ack_job(job)
+        try:
+            result = process_upload_job(upload_id)
+            if result.success:
+                logger.info(f"Successfully processed upload {upload_id}")
+            else:
+                logger.warning(f"Failed to process upload {upload_id}: {result.error}")
+        except Exception as exc:
+            # Safety net: if process_upload_job itself crashes, try to mark as failed
+            logger.exception(f"CRITICAL: process_upload_job crashed for upload {upload_id}: {exc}")
+            try:
+                uploads_repo.mark_failed(upload_id)
+                logger.info(f"Marked upload {upload_id} as failed after crash")
+            except Exception as mark_error:
+                logger.error(f"Could not mark upload {upload_id} as failed: {mark_error}")
+        finally:
+            # Always ack the job so it doesn't get redelivered
+            ack_job(job)
 
         processed += 1
         if stop_after is not None and processed >= stop_after:

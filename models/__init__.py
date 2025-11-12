@@ -73,11 +73,44 @@ def _normalize_sqlite_path(database_url: str) -> str:
 def get_connection():
     """Return a singleton database connection."""
     global _connection, _backend
+    # If connection exists but _backend is None, something went wrong - reset it
     if _connection is not None:
+        if _backend is None:
+            # Backend wasn't set - this shouldn't happen, but fix it
+            if "psycopg" in str(type(_connection)):
+                _backend = "postgres"
+            elif "sqlite3" in str(type(_connection)):
+                _backend = "sqlite"
         return _connection
 
+    # CRITICAL: Try to ensure environment is loaded before getting settings
+    # This is a safety net in case get_connection() is called before Flask app initializes
+    import os
+    if not os.getenv("DATABASE_URL"):
+        # Try loading from .env file if not in environment
+        try:
+            from pathlib import Path
+            from dotenv import load_dotenv
+            base_dir = Path(__file__).resolve().parent.parent
+            env_path = base_dir / ".env"
+            if env_path.exists():
+                load_dotenv(env_path, override=True)
+        except Exception:
+            pass  # If loading fails, continue with current environment
+    
     settings = get_settings()
-    database_url = settings.DATABASE_URL or f"sqlite:///{_resolve_default_sqlite_path()}"
+    
+    # CRITICAL: If DATABASE_URL is set and points to PostgreSQL, ALWAYS use it
+    # NEVER fall back to SQLite if DATABASE_URL is configured for PostgreSQL
+    if settings.DATABASE_URL and not settings.DATABASE_URL.startswith("sqlite"):
+        # Force PostgreSQL - don't allow SQLite fallback
+        database_url = settings.DATABASE_URL
+    elif settings.DATABASE_URL and settings.DATABASE_URL.startswith("sqlite"):
+        # If explicitly set to SQLite, use it
+        database_url = settings.DATABASE_URL
+    else:
+        # Only use SQLite as fallback if DATABASE_URL is completely unset
+        database_url = f"sqlite:///{_resolve_default_sqlite_path()}"
 
     # Normalize database URL - handle postgres:// and postgresql://
     if database_url and not database_url.startswith("sqlite"):
@@ -98,9 +131,16 @@ def get_connection():
         _backend = "sqlite"
     else:
         # PostgreSQL connection
-        conn = psycopg.connect(database_url, row_factory=dict_row)
-        _connection = conn
-        _backend = "postgres"
+        try:
+            conn = psycopg.connect(database_url, row_factory=dict_row)
+            _connection = conn
+            _backend = "postgres"
+        except Exception as e:
+            # If PostgreSQL connection fails, log error but don't fall back to SQLite
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to connect to PostgreSQL: {e}")
+            raise
 
     return _connection
 
@@ -109,9 +149,12 @@ def reset_engine() -> None:
     """Reset the current database connection (used in tests)."""
     global _connection, _backend
     if _connection is not None:
-        _connection.close()
+        try:
+            _connection.close()
+        except Exception:
+            pass  # Ignore errors when closing
     _connection = None
-    _backend = None
+    _backend = None  # CRITICAL: Reset backend so it gets set correctly on next connection
 
 
 def init_db() -> None:
@@ -1074,6 +1117,7 @@ def list_students_with_stats_for_educator(
                 SELECT
                     u.id AS student_id,
                     u.name,
+                    u.username,
                     sp.grade_level,
                     sp.class_number,
                     sp.vocabulary_level,
@@ -1104,6 +1148,7 @@ def list_students_with_stats_for_educator(
                 {
                     "id": row["student_id"],
                     "name": row["name"],
+                    "username": row["username"],
                     "grade_level": row["grade_level"],
                     "class_number": row["class_number"],
                     "vocabulary_level": row["vocabulary_level"],
@@ -1118,6 +1163,7 @@ def list_students_with_stats_for_educator(
             SELECT
                 u.id AS student_id,
                 u.name,
+                u.username,
                 sp.grade_level,
                 sp.class_number,
                 sp.vocabulary_level,
@@ -1148,6 +1194,7 @@ def list_students_with_stats_for_educator(
             {
                 "id": row["student_id"],
                 "name": row["name"],
+                "username": row["username"],
                 "grade_level": row["grade_level"],
                 "class_number": row["class_number"],
                 "vocabulary_level": row["vocabulary_level"],
@@ -1174,6 +1221,7 @@ def list_students_with_stats_for_grade(
                 SELECT
                     u.id AS student_id,
                     u.name,
+                    u.username,
                     sp.grade_level,
                     sp.class_number,
                     sp.vocabulary_level,
@@ -1204,6 +1252,7 @@ def list_students_with_stats_for_grade(
                 {
                     "id": row["student_id"],
                     "name": row["name"],
+                    "username": row["username"],
                     "grade_level": row["grade_level"],
                     "class_number": row["class_number"],
                     "vocabulary_level": row["vocabulary_level"],
@@ -1217,6 +1266,7 @@ def list_students_with_stats_for_grade(
             SELECT
                 u.id AS student_id,
                 u.name,
+                u.username,
                 sp.grade_level,
                 sp.class_number,
                 sp.vocabulary_level,
@@ -1242,6 +1292,7 @@ def list_students_with_stats_for_grade(
             {
                 "id": row["student_id"],
                 "name": row["name"],
+                "username": row["username"],
                 "grade_level": row["grade_level"],
                 "class_number": row["class_number"],
                 "vocabulary_level": row["vocabulary_level"],
@@ -1268,6 +1319,7 @@ def list_students_with_stats_for_class(
                 SELECT
                     u.id AS student_id,
                     u.name,
+                    u.username,
                     sp.grade_level,
                     sp.class_number,
                     sp.vocabulary_level,
@@ -1298,6 +1350,7 @@ def list_students_with_stats_for_class(
                 {
                     "id": row["student_id"],
                     "name": row["name"],
+                    "username": row["username"],
                     "grade_level": row["grade_level"],
                     "class_number": row["class_number"],
                     "vocabulary_level": row["vocabulary_level"],
@@ -1312,6 +1365,7 @@ def list_students_with_stats_for_class(
             SELECT
                 u.id AS student_id,
                 u.name,
+                u.username,
                 sp.grade_level,
                 sp.class_number,
                 sp.vocabulary_level,
@@ -1342,6 +1396,7 @@ def list_students_with_stats_for_class(
             {
                 "id": row["student_id"],
                 "name": row["name"],
+                "username": row["username"],
                 "grade_level": row["grade_level"],
                 "class_number": row["class_number"],
                 "vocabulary_level": row["vocabulary_level"],
@@ -1351,6 +1406,126 @@ def list_students_with_stats_for_class(
             }
             for row in rows
         ]
+    finally:
+        cur.close()
+
+
+def get_student_overview_by_username(
+    educator_id: int, username: str
+) -> Optional[dict[str, object]]:
+    """Return student profile summary by username if it belongs to the educator."""
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        if _backend == "sqlite":
+            cur.execute(
+                """
+                SELECT
+                    u.id AS student_id,
+                    u.name,
+                    u.email,
+                    u.username,
+                    sp.grade_level,
+                    sp.class_number,
+                    sp.vocabulary_level,
+                    sp.last_analyzed_at,
+                    (
+                        SELECT COUNT(*)
+                        FROM recommendations r
+                        WHERE r.student_id = sp.student_id AND r.status = 'pending'
+                    ) AS pending_words,
+                    (
+                        SELECT COUNT(*)
+                        FROM recommendations r
+                        WHERE r.student_id = sp.student_id AND r.status = 'approved'
+                    ) AS approved_words,
+                    (
+                        SELECT COUNT(*)
+                        FROM recommendations r
+                        WHERE r.student_id = sp.student_id AND r.status = 'rejected'
+                    ) AS rejected_words,
+                    (
+                        SELECT MAX(created_at)
+                        FROM uploads up
+                        WHERE up.student_id = sp.student_id
+                    ) AS last_upload_at
+                FROM student_profiles sp
+                JOIN users u ON u.id = sp.student_id
+                WHERE sp.educator_id = ? AND u.username = ?;
+                """,
+                (educator_id, username),
+            )
+            row = cur.fetchone()
+            if row is None:
+                return None
+            return {
+                "student_id": row["student_id"],
+                "name": row["name"],
+                "email": row["email"],
+                "username": row["username"],
+                "grade_level": row["grade_level"],
+                "class_number": row["class_number"],
+                "vocabulary_level": row["vocabulary_level"],
+                "last_analyzed_at": row["last_analyzed_at"],
+                "pending_words": row["pending_words"] or 0,
+                "approved_words": row["approved_words"] or 0,
+                "rejected_words": row["rejected_words"] or 0,
+                "last_upload_at": row["last_upload_at"],
+            }
+        cur.execute(
+            """
+            SELECT
+                u.id AS student_id,
+                u.name,
+                u.email,
+                u.username,
+                sp.grade_level,
+                sp.class_number,
+                sp.vocabulary_level,
+                sp.last_analyzed_at,
+                (
+                    SELECT COUNT(*)
+                    FROM recommendations r
+                    WHERE r.student_id = sp.student_id AND r.status = 'pending'
+                ) AS pending_words,
+                (
+                    SELECT COUNT(*)
+                    FROM recommendations r
+                    WHERE r.student_id = sp.student_id AND r.status = 'approved'
+                ) AS approved_words,
+                (
+                    SELECT COUNT(*)
+                    FROM recommendations r
+                    WHERE r.student_id = sp.student_id AND r.status = 'rejected'
+                ) AS rejected_words,
+                (
+                    SELECT MAX(created_at)
+                    FROM uploads up
+                    WHERE up.student_id = sp.student_id
+                ) AS last_upload_at
+            FROM student_profiles sp
+            JOIN users u ON u.id = sp.student_id
+            WHERE sp.educator_id = %s AND u.username = %s;
+            """,
+            (educator_id, username),
+        )
+        row = cur.fetchone()
+        if row is None:
+            return None
+        return {
+            "student_id": row["student_id"],
+            "name": row["name"],
+            "email": row["email"],
+            "username": row["username"],
+            "grade_level": row["grade_level"],
+            "class_number": row["class_number"],
+            "vocabulary_level": row["vocabulary_level"],
+            "last_analyzed_at": row["last_analyzed_at"],
+            "pending_words": row["pending_words"] or 0,
+            "approved_words": row["approved_words"] or 0,
+            "rejected_words": row["rejected_words"] or 0,
+            "last_upload_at": row["last_upload_at"],
+        }
     finally:
         cur.close()
 
@@ -1369,6 +1544,7 @@ def get_student_overview(
                     u.id AS student_id,
                     u.name,
                     u.email,
+                    u.username,
                     sp.grade_level,
                     sp.class_number,
                     sp.vocabulary_level,
@@ -1406,6 +1582,7 @@ def get_student_overview(
                 "student_id": row["student_id"],
                 "name": row["name"],
                 "email": row["email"],
+                "username": row.get("username", ""),
                 "grade_level": row["grade_level"],
                 "class_number": row["class_number"],
                 "vocabulary_level": row["vocabulary_level"],
@@ -1421,6 +1598,7 @@ def get_student_overview(
                 u.id AS student_id,
                 u.name,
                 u.email,
+                u.username,
                 sp.grade_level,
                 sp.class_number,
                 sp.vocabulary_level,
@@ -1458,6 +1636,7 @@ def get_student_overview(
             "student_id": row["student_id"],
             "name": row["name"],
             "email": row["email"],
+            "username": row.get("username", ""),
             "grade_level": row["grade_level"],
             "class_number": row["class_number"],
             "vocabulary_level": row["vocabulary_level"],
@@ -1480,7 +1659,18 @@ def create_upload_record(
     status: str = "pending",
 ) -> int:
     """Insert a new upload row and return its identifier."""
+    # CRITICAL: Ensure environment is loaded before resetting connection
+    # This ensures DATABASE_URL is available when get_connection() is called
+    from config.settings import get_settings
+    _ = get_settings()  # This ensures environment is loaded
+    
+    # CRITICAL: Reset connection to ensure we use the correct database
+    # This is especially important when called from Flask routes
+    reset_engine()
+    
     conn = get_connection()
+    # _backend is set by get_connection(), access it as a global
+    global _backend
     cur = conn.cursor()
     try:
         if _backend == "sqlite":
@@ -1659,7 +1849,8 @@ def get_student_profile(student_id: int) -> Optional[dict[str, object]]:
                        sp.vocabulary_level,
                        sp.last_analyzed_at,
                        u.name,
-                       u.email
+                       u.email,
+                       u.username
                 FROM student_profiles sp
                 JOIN users u ON u.id = sp.student_id
                 WHERE sp.student_id = ?;
@@ -1677,7 +1868,8 @@ def get_student_profile(student_id: int) -> Optional[dict[str, object]]:
                    sp.vocabulary_level,
                    sp.last_analyzed_at,
                    u.name,
-                   u.email
+                   u.email,
+                   u.username
             FROM student_profiles sp
             JOIN users u ON u.id = sp.student_id
             WHERE sp.student_id = %s;
