@@ -12,7 +12,7 @@ _LOCAL_QUEUE: "queue.Queue[dict[str, int]]" = queue.Queue()
 
 def queue_mode() -> str:
     settings = get_settings()
-    if settings.AWS_SQS_QUEUE_URL:
+    if settings.AWS_SQS_QUEUE_URL and settings.AWS_SQS_QUEUE_URL.strip():
         return "sqs"
     return settings.JOB_QUEUE_PROVIDER or "inmemory"
 
@@ -49,7 +49,7 @@ def enqueue_upload_job(upload_id: int) -> None:
     if mode == "sqs":
         settings = get_settings()
         queue_url = settings.AWS_SQS_QUEUE_URL
-        if not queue_url:
+        if not queue_url or not queue_url.strip():
             # fall back to local queue when URL not configured
             _LOCAL_QUEUE.put({"upload_id": int(upload_id)})
             return
@@ -86,8 +86,16 @@ def dequeue_upload_job(
     if mode == "sqs":
         settings = get_settings()
         queue_url = settings.AWS_SQS_QUEUE_URL
-        if not queue_url:
-            return None
+        if not queue_url or not queue_url.strip():
+            # Fall back to local queue if SQS URL not configured
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.debug("SQS queue URL not configured, falling back to local queue")
+            try:
+                payload = _LOCAL_QUEUE.get(timeout=poll_timeout)
+            except queue.Empty:
+                return None
+            return dict(payload)
 
         sqs = _make_boto_client("sqs")
         wait_time = max(0, min(int(poll_timeout), 20))
@@ -117,11 +125,15 @@ def dequeue_upload_job(
                 "receipt_handle": message["ReceiptHandle"],
             }
         except Exception as e:
-            # If SQS receive fails, log the error and return None (will retry on next poll)
+            # If SQS receive fails, fall back to local queue
             import logging
             logger = logging.getLogger(__name__)
-            logger.warning(f"SQS receive_message failed: {e}")
-            return None
+            logger.warning(f"SQS receive_message failed, falling back to local queue: {e}")
+            try:
+                payload = _LOCAL_QUEUE.get(timeout=0.1)  # Quick check, don't wait long
+            except queue.Empty:
+                return None
+            return dict(payload)
 
     try:
         payload = _LOCAL_QUEUE.get(timeout=poll_timeout)
