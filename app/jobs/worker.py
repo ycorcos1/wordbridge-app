@@ -419,9 +419,11 @@ if __name__ == "__main__":
         reset_engine()
         
         # Verify connection works and can query uploads
-        from models import get_connection, _backend
+        from models import get_connection
         conn = get_connection()
-        backend = "PostgreSQL" if _backend == "postgres" else "SQLite"
+        # Check connection type directly since _backend might not be set yet
+        is_postgres = "psycopg" in str(type(conn))
+        backend = "PostgreSQL" if is_postgres else "SQLite"
         logger.info(f"Database initialized successfully (using {backend})")
         
         # Test that we can actually query the database
