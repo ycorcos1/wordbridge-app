@@ -604,6 +604,20 @@ def create_user(
     return user
 
 
+def delete_user(user_id: int) -> None:
+    """Delete a user and all their associated data via CASCADE."""
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        if _backend == "sqlite":
+            cur.execute("DELETE FROM users WHERE id = ?;", (user_id,))
+        else:
+            cur.execute("DELETE FROM users WHERE id = %s;", (user_id,))
+        conn.commit()
+    finally:
+        cur.close()
+
+
 def _default_baseline_dir() -> Path:
     root_dir = os.path.dirname(os.path.dirname(__file__))
     return Path(root_dir) / "data" / "baseline"

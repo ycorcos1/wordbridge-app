@@ -359,6 +359,15 @@
         <a class="button" href="{{ url_for('core.educator_upload_page') }}"
           >Upload Work</a
         >
+        <button
+          class="button"
+          id="delete-student-button"
+          style="background-color: #dc3545; border: none; cursor: pointer;"
+          data-student-id="{{ overview.student_id }}"
+          data-student-name="{{ overview.name }}"
+        >
+          Delete Student
+        </button>
         <a class="button" href="{{ url_for('core.logout') }}">Log Out</a>
       </nav>
     </header>
@@ -524,7 +533,7 @@
       </div>
     </section>
 
-    <!-- Delete Confirmation Modal -->
+    <!-- Delete Upload Confirmation Modal -->
     <div id="delete-modal" class="modal-overlay">
       <div class="modal">
         <h3>Delete Upload</h3>
@@ -541,6 +550,28 @@
             id="delete-modal-confirm"
           >
             Delete
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delete Student Confirmation Modal -->
+    <div id="delete-student-modal" class="modal-overlay">
+      <div class="modal">
+        <h3>Delete Student</h3>
+        <p id="delete-student-modal-message"></p>
+        <div class="modal-actions">
+          <button
+            class="modal-button modal-button-cancel"
+            id="delete-student-modal-cancel"
+          >
+            Cancel
+          </button>
+          <button
+            class="modal-button modal-button-delete"
+            id="delete-student-modal-confirm"
+          >
+            Delete Student
           </button>
         </div>
       </div>
@@ -948,6 +979,83 @@
           const isPinned = button.getAttribute("data-pinned") === "true";
           togglePin(recId, isPinned);
         }
+      });
+
+      // Delete Student functionality
+      const deleteStudentButton = document.getElementById("delete-student-button");
+      const deleteStudentModal = document.getElementById("delete-student-modal");
+      const deleteStudentModalMessage = document.getElementById("delete-student-modal-message");
+      const deleteStudentModalCancel = document.getElementById("delete-student-modal-cancel");
+      const deleteStudentModalConfirm = document.getElementById("delete-student-modal-confirm");
+
+      deleteStudentButton.addEventListener("click", function() {
+        const studentId = deleteStudentButton.getAttribute("data-student-id");
+        const studentName = deleteStudentButton.getAttribute("data-student-name");
+        
+        deleteStudentModalMessage.textContent = 
+          `Are you sure you want to delete "${studentName}"?\n\n` +
+          "This will permanently delete:\n" +
+          "• The student account\n" +
+          "• All uploaded files\n" +
+          "• All vocabulary recommendations\n" +
+          "• All quiz attempts and progress\n\n" +
+          "This action cannot be undone.";
+        
+        deleteStudentModal.classList.add("active");
+      });
+
+      deleteStudentModalCancel.addEventListener("click", function() {
+        deleteStudentModal.classList.remove("active");
+      });
+
+      deleteStudentModal.addEventListener("click", function(e) {
+        if (e.target === deleteStudentModal) {
+          deleteStudentModal.classList.remove("active");
+        }
+      });
+
+      deleteStudentModalConfirm.addEventListener("click", function() {
+        const studentId = deleteStudentButton.getAttribute("data-student-id");
+        
+        deleteStudentButton.disabled = true;
+        deleteStudentButton.textContent = "Deleting...";
+        deleteStudentModalConfirm.disabled = true;
+        deleteStudentModalConfirm.textContent = "Deleting...";
+
+        fetch(`/api/educator/students/${studentId}`, {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+        })
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+          })
+          .then((data) => {
+            if (data.success) {
+              // Redirect to dashboard after successful deletion
+              window.location.href = "{{ url_for('core.educator_dashboard') }}";
+            } else {
+              showError("Error: " + (data.error || "Failed to delete student"));
+              deleteStudentButton.disabled = false;
+              deleteStudentButton.textContent = "Delete Student";
+              deleteStudentModalConfirm.disabled = false;
+              deleteStudentModalConfirm.textContent = "Delete Student";
+              deleteStudentModal.classList.remove("active");
+            }
+          })
+          .catch((error) => {
+            showError("Error: " + error.message);
+            deleteStudentButton.disabled = false;
+            deleteStudentButton.textContent = "Delete Student";
+            deleteStudentModalConfirm.disabled = false;
+            deleteStudentModalConfirm.textContent = "Delete Student";
+            deleteStudentModal.classList.remove("active");
+          });
       });
     </script>
   </body>

@@ -1214,6 +1214,34 @@ def api_delete_upload(student_id: int, upload_id: int):
         return jsonify({"error": f"Failed to delete upload: {str(e)}"}), 500
 
 
+@bp.delete("/api/educator/students/<int:student_id>")
+@role_required("educator")
+def api_delete_student(student_id: int):
+    """Delete a student and all their associated data. Verifies the student belongs to the educator."""
+    # Verify student belongs to educator
+    overview = get_student_overview(current_user.id, student_id)
+    if overview is None:
+        return jsonify({"error": "Student not found or access denied."}), 404
+    
+    # Delete the student user (CASCADE will delete:
+    # - student_profiles
+    # - uploads (via student_id foreign key)
+    # - recommendations (via upload_id foreign key in delete_upload)
+    # - student_progress
+    # - badges
+    # - word_mastery
+    # - quiz_attempts
+    try:
+        from models import delete_user
+        delete_user(student_id)
+        return jsonify({"success": True, "message": "Student and all associated data deleted successfully."}), 200
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to delete student {student_id}: {e}", exc_info=True)
+        return jsonify({"error": f"Failed to delete student: {str(e)}"}), 500
+
+
 @bp.get("/quiz")
 @role_required("student")
 def student_quiz_page():
