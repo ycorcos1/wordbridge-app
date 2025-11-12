@@ -165,7 +165,8 @@ def _process_attempt(
         cur = conn.cursor()
         try:
             from models import _backend
-            if _backend == "sqlite":
+            is_sqlite = _backend == "sqlite" if _backend else "sqlite3" in str(type(conn))
+            if is_sqlite:
                 cur.execute("SELECT id, status FROM uploads WHERE id = ?", (upload_id,))
             else:
                 cur.execute("SELECT id, status FROM uploads WHERE id = %s", (upload_id,))
@@ -287,8 +288,9 @@ def _recover_stuck_uploads() -> None:
         
         # Find pending uploads older than 2 minutes
         # Check backend by trying to detect connection type
-        is_sqlite = hasattr(conn, 'execute') and 'sqlite3' in str(type(conn))
-        if is_sqlite or (hasattr(models, '_backend') and models._backend == "sqlite"):
+        from models import _backend
+        is_sqlite = _backend == "sqlite" if _backend else 'sqlite3' in str(type(conn))
+        if is_sqlite:
             cur.execute("""
                 SELECT id FROM uploads 
                 WHERE status = 'pending' 
@@ -429,7 +431,7 @@ if __name__ == "__main__":
         # Test that we can actually query the database
         cur = conn.cursor()
         try:
-            if _backend == "sqlite":
+            if is_postgres:
                 cur.execute("SELECT COUNT(*) FROM uploads")
             else:
                 cur.execute("SELECT COUNT(*) FROM uploads")
