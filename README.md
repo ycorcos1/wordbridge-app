@@ -585,7 +585,20 @@ Here are potential enhancements that would fit well within the WordBridge ecosys
 - **Horizontal Scaling**: Support for multiple worker instances
 - **Database Optimization**: Query optimization and indexing improvements
 
-### 10. **Research & Insights**
+### 10. **Personalized Book & Author Recommendations**
+
+- **AI-Powered Book Matching**: Recommend books and authors tailored to each student's vocabulary level and interests based on their writing samples
+- **Level-Appropriate Suggestions**: Books matched to student's current reading proficiency and vocabulary level
+- **Interest-Based Filtering**: Analyze writing topics and themes to suggest books aligned with student interests (e.g., science fiction, historical fiction, adventure)
+- **Student Feedback System**: Allow students to provide feedback on recommended books:
+  - "I couldn't get into it" - System learns preferences and adjusts future recommendations
+  - "I got into it but lost interest midway" - Identifies pacing or complexity issues
+  - "I like this book/author" - Strengthens interest profile for better future matches
+- **Adaptive Recommendations**: Feedback loop continuously refines book suggestions based on student responses
+- **Author Discovery**: Recommend other works by authors students enjoy
+- **Reading Progress Integration**: Track which recommended books students are reading and how it correlates with vocabulary growth
+
+### 11. **Research & Insights**
 
 - **Vocabulary Growth Tracking**: Longitudinal analysis of vocabulary development
 - **Learning Pattern Analysis**: Identify optimal learning strategies for different student types

@@ -8,7 +8,6 @@ import os
 import sqlite3
 from pathlib import Path
 from typing import Dict, Optional, Sequence
-from urllib.parse import urlparse
 
 import psycopg
 from flask_login import UserMixin
@@ -53,23 +52,6 @@ class User(UserMixin):
         return f"<User id={self.id} role={self.role} username={self.username!r}>"
 
 
-def _resolve_default_sqlite_path() -> str:
-    root_dir = os.path.dirname(os.path.dirname(__file__))
-    return os.path.join(root_dir, "wordbridge_dev.sqlite")
-
-
-def _normalize_sqlite_path(database_url: str) -> str:
-    parsed = urlparse(database_url)
-    path = parsed.path or ""
-    if path.startswith("/"):
-        path = path[1:]
-    if path in {"", ":memory:"}:
-        return ":memory:"
-    if parsed.netloc:
-        path = os.path.join(parsed.netloc, path)
-    return path or _resolve_default_sqlite_path()
-
-
 def get_connection():
     """Return a singleton database connection."""
     global _connection, _backend
@@ -100,47 +82,25 @@ def get_connection():
     
     settings = get_settings()
     
-    # CRITICAL: If DATABASE_URL is set and points to PostgreSQL, ALWAYS use it
-    # NEVER fall back to SQLite if DATABASE_URL is configured for PostgreSQL
-    if settings.DATABASE_URL and not settings.DATABASE_URL.startswith("sqlite"):
-        # Force PostgreSQL - don't allow SQLite fallback
-        database_url = settings.DATABASE_URL
-    elif settings.DATABASE_URL and settings.DATABASE_URL.startswith("sqlite"):
-        # If explicitly set to SQLite, use it
-        database_url = settings.DATABASE_URL
-    else:
-        # Only use SQLite as fallback if DATABASE_URL is completely unset
-        database_url = f"sqlite:///{_resolve_default_sqlite_path()}"
+    database_url = settings.DATABASE_URL
+    if not database_url:
+        raise RuntimeError("DATABASE_URL must be set and point to a PostgreSQL instance.")
+    if database_url.startswith("sqlite"):
+        raise RuntimeError("SQLite is no longer supported. Provide a PostgreSQL DATABASE_URL.")
 
-    # Normalize database URL - handle postgres:// and postgresql://
-    if database_url and not database_url.startswith("sqlite"):
-        # Ensure it's treated as PostgreSQL
-        if database_url.startswith("postgres://"):
-            database_url = database_url.replace("postgres://", "postgresql://", 1)
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql://", 1)
 
-    if database_url and database_url.startswith("sqlite"):
-        db_path = _normalize_sqlite_path(database_url)
-        conn = sqlite3.connect(
-            db_path,
-            detect_types=sqlite3.PARSE_DECLTYPES,
-            check_same_thread=False,
-        )
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys = ON;")
+    try:
+        conn = psycopg.connect(database_url, row_factory=dict_row)
         _connection = conn
-        _backend = "sqlite"
-    else:
-        # PostgreSQL connection
-        try:
-            conn = psycopg.connect(database_url, row_factory=dict_row)
-            _connection = conn
-            _backend = "postgres"
-        except Exception as e:
-            # If PostgreSQL connection fails, log error but don't fall back to SQLite
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Failed to connect to PostgreSQL: {e}")
-            raise
+        _backend = "postgres"
+    except Exception as e:
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to connect to PostgreSQL: {e}")
+        raise
 
     return _connection
 
@@ -346,6 +306,7 @@ def init_db() -> None:
                 """
             )
         else:
+            raise RuntimeError("PostgreSQL backend is required for init_db.")
             cur.execute(
                 """
                 CREATE TABLE IF NOT EXISTS users (
@@ -1817,19 +1778,69 @@ def list_uploads_for_student(student_id: int) -> list[dict[str, object]]:
 
 
 def delete_upload(upload_id: int) -> None:
-    """Delete an upload and its associated recommendations."""
+    """Delete an upload and its associated recommendations, S3 file, and any SQS messages."""
     conn = get_connection()
     cur = conn.cursor()
     try:
-        # First delete recommendations associated with this upload
+        # First, get the file path before deleting the record
+        if _backend == "sqlite":
+            cur.execute("SELECT file_path FROM uploads WHERE id = ?;", (upload_id,))
+        else:
+            cur.execute("SELECT file_path FROM uploads WHERE id = %s;", (upload_id,))
+        row = cur.fetchone()
+        file_path = row.get("file_path") if row else None
+        
+        # Delete recommendations associated with this upload
         delete_recommendations_for_upload(upload_id)
         
-        # Then delete the upload itself
+        # Delete the upload record from database
         if _backend == "sqlite":
             cur.execute("DELETE FROM uploads WHERE id = ?;", (upload_id,))
         else:
             cur.execute("DELETE FROM uploads WHERE id = %s;", (upload_id,))
         conn.commit()
+        
+        # Delete S3 file if it exists
+        if file_path and file_path.startswith("s3://"):
+            try:
+                from config.settings import get_settings
+                import boto3
+                from urllib.parse import urlparse
+                import logging
+                
+                logger = logging.getLogger(__name__)
+                settings = get_settings()
+                # Parse s3://bucket/key format
+                parsed = urlparse(file_path)
+                bucket_name = parsed.netloc
+                s3_key = parsed.path.lstrip("/")
+                
+                # Delete from S3 - use same region extraction logic as queue
+                region_name = "us-east-2"  # Default region
+                # Try to extract region from SQS queue URL if available
+                if settings.AWS_SQS_QUEUE_URL:
+                    try:
+                        from urllib.parse import urlparse
+                        parsed_sqs = urlparse(settings.AWS_SQS_QUEUE_URL)
+                        hostname_parts = parsed_sqs.hostname.split(".")
+                        if len(hostname_parts) >= 2 and hostname_parts[0] == "sqs":
+                            region_name = hostname_parts[1]
+                    except Exception:
+                        pass
+                
+                s3_client = boto3.client(
+                    "s3",
+                    region_name=region_name,
+                    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+                )
+                s3_client.delete_object(Bucket=bucket_name, Key=s3_key)
+                logger.info("Deleted S3 file: %s", file_path)
+            except Exception as s3_error:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning("Failed to delete S3 file %s: %s", file_path, s3_error)
+                # Don't fail the whole delete operation if S3 delete fails
     finally:
         cur.close()
 

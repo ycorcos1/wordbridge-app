@@ -25,13 +25,18 @@ from flask_login import current_user, login_required, login_user, logout_user
 from werkzeug.utils import secure_filename
 
 from config.settings import get_settings
-from app.jobs.queue import enqueue_upload_job
+from app.jobs.queue import (
+    enqueue_upload_job,
+    QueueConfigurationError,
+    QueueOperationError,
+)
 from app.repositories import (
     bulk_update_status as repo_bulk_update_status,
     list_for_educator as repo_list_recommendations,
     set_pinned as repo_set_recommendation_pinned,
     update_rationale as repo_update_recommendation_rationale,
 )
+from app.repositories import uploads_repo
 from app.services.quizzes import build_quiz_questions, score_quiz_and_update
 from models import (
     create_student_profile,
@@ -1144,6 +1149,7 @@ def api_upload():
         timestamp = int(time.time())
         s3_key = f"uploads/{current_user.id}/{student_id}/{timestamp}_{original_name}"
 
+        upload_id = None  # Initialize to track if upload record was created
         try:
             s3_client.upload_fileobj(stream, settings.AWS_S3_BUCKET_NAME, s3_key)
             file_path = f"s3://{settings.AWS_S3_BUCKET_NAME}/{s3_key}"
@@ -1151,14 +1157,13 @@ def api_upload():
             # CRITICAL: Ensure we're using the correct database before creating upload
             # Reset connection to pick up any environment changes
             from models import reset_engine, get_connection
+            import logging
+
+            logger = logging.getLogger(__name__)
             reset_engine()
             conn = get_connection()
-            # Log which database we're using for debugging
-            import logging
-            logger = logging.getLogger(__name__)
-            from models import _backend
-            logger.info(f"Creating upload record - backend: {_backend}, connection type: {type(conn)}")
-            
+            logger.info("Creating upload record using connection %s", type(conn))
+
             upload_id = create_upload_record(
                 educator_id=current_user.id,
                 student_id=student_id,
@@ -1166,34 +1171,113 @@ def api_upload():
                 filename=original_name,
                 status="pending",
             )
-            
-            # Enqueue MUST succeed - if it fails, we need to know about it
-            import logging
-            logger = logging.getLogger(__name__)
+            logger.info(
+                "Created upload record %s for file %s (student %s)",
+                upload_id,
+                original_name,
+                student_id,
+            )
+
+            # CRITICAL: Enqueue MUST succeed or upload will be stuck
+            # This MUST happen immediately after creating the upload record
+            logger.info("Attempting to enqueue upload job %s to SQS", upload_id)
             try:
                 enqueue_upload_job(upload_id)
-                logger.info(f"Successfully enqueued upload job {upload_id} for file {original_name} (student {student_id})")
+                # Mark as processing immediately so UI shows correct state
+                from models import update_upload_status
+                update_upload_status(upload_id, "processing")
+                logger.info(
+                    "Successfully enqueued upload job %s for file %s (student %s) - marked as processing",
+                    upload_id,
+                    original_name,
+                    student_id,
+                )
+                results.append(
+                    {
+                        "filename": original_name,
+                        "upload_id": upload_id,
+                        "status": "processing",
+                        "file_path": file_path,
+                    }
+                )
+            except (QueueConfigurationError, QueueOperationError) as enqueue_error:
+                logger.error(
+                    "CRITICAL: Failed to enqueue upload job %s for file %s: %s",
+                    upload_id,
+                    original_name,
+                    enqueue_error,
+                    exc_info=True,
+                )
+                # Mark as failed immediately so it doesn't get stuck
+                try:
+                    uploads_repo.mark_failed(upload_id)
+                    logger.info("Marked upload %s as failed due to enqueue error", upload_id)
+                except Exception as mark_error:
+                    logger.error("Failed to mark upload %s as failed: %s", upload_id, mark_error)
+                results.append(
+                    {
+                        "filename": original_name,
+                        "upload_id": upload_id,
+                        "status": "failed",
+                        "file_path": file_path,
+                        "error": "Upload could not be queued for processing. Please try again later.",
+                    }
+                )
+                continue
             except Exception as enqueue_error:
-                logger.error(f"CRITICAL: Failed to enqueue upload job {upload_id} for file {original_name}: {enqueue_error}", exc_info=True)
-                # Don't fail the upload - let the recovery function pick it up
-                # But log it so we know there's an issue
-                logger.warning(f"Upload {upload_id} created but not enqueued. Recovery function will pick it up within 1 minute.")
-
-            results.append(
-                {
-                    "filename": original_name,
-                    "upload_id": upload_id,
-                    "status": "pending",
-                    "file_path": file_path,
-                }
-            )
+                # Catch any other unexpected errors during enqueue
+                logger.error(
+                    "UNEXPECTED error enqueuing upload job %s for file %s: %s",
+                    upload_id,
+                    original_name,
+                    enqueue_error,
+                    exc_info=True,
+                )
+                # Still mark as failed
+                try:
+                    uploads_repo.mark_failed(upload_id)
+                except Exception:
+                    pass
+                results.append(
+                    {
+                        "filename": original_name,
+                        "upload_id": upload_id,
+                        "status": "failed",
+                        "file_path": file_path,
+                        "error": f"Upload processing failed: {str(enqueue_error)}",
+                    }
+                )
+                continue
         except Exception as exc:  # pragma: no cover - network or boto errors
             import logging
             logger = logging.getLogger(__name__)
-            logger.error(f"Error processing upload {original_name}: {exc}", exc_info=True)
+            logger.error(
+                "Error processing upload %s: %s",
+                original_name,
+                exc,
+                exc_info=True,
+            )
+            # If we created an upload record but failed to enqueue, mark it as failed
+            # This is critical - if upload_id exists, we MUST mark it as failed
+            if upload_id is not None:
+                try:
+                    logger.error(
+                        "CRITICAL: Upload %s was created but processing failed - marking as failed. Error: %s",
+                        upload_id,
+                        exc,
+                    )
+                    uploads_repo.mark_failed(upload_id)
+                    logger.info("Successfully marked upload %s as failed", upload_id)
+                except Exception as mark_exc:
+                    logger.error(
+                        "CRITICAL: Failed to mark upload %s as failed: %s",
+                        upload_id,
+                        mark_exc,
+                        exc_info=True,
+                    )
             results.append({"filename": original_name, "error": str(exc)})
 
-    successful = [entry for entry in results if "upload_id" in entry]
+    successful = [entry for entry in results if entry.get("status") == "pending"]
     if not successful:
         return jsonify({"results": results}), 400
     status_code = 207 if len(successful) != len(results) else 201

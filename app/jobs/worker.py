@@ -42,6 +42,61 @@ from .queue import ack_job, dequeue_upload_job
 logger = logging.getLogger(__name__)
 
 
+class WorkerConfigurationError(RuntimeError):
+    """Raised when the worker environment is misconfigured."""
+
+
+def _verify_worker_environment() -> None:
+    """Ensure required services (PostgreSQL, SQS, OpenAI) are configured."""
+    settings = get_settings()
+
+    if not settings.DATABASE_URL:
+        raise WorkerConfigurationError("DATABASE_URL must be set for the worker.")
+    if settings.DATABASE_URL.startswith("sqlite"):
+        raise WorkerConfigurationError("SQLite is not supported for worker processing.")
+
+    queue_url = settings.AWS_SQS_QUEUE_URL
+    if not queue_url or not queue_url.strip():
+        raise WorkerConfigurationError(
+            "AWS_SQS_QUEUE_URL must be defined; SQS is required for processing."
+        )
+
+    if not settings.OPENAI_API_KEY:
+        raise WorkerConfigurationError(
+            "OPENAI_API_KEY must be configured for recommendation generation."
+        )
+
+    # Verify database connectivity
+    from models import get_connection, reset_engine
+
+    reset_engine()
+    conn = get_connection()
+    if "psycopg" not in str(type(conn)):
+        raise WorkerConfigurationError(
+            f"Worker expected PostgreSQL connection, received {type(conn)}"
+        )
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT 1;")
+        cur.fetchone()
+    finally:
+        cur.close()
+
+    # Verify SQS connectivity
+    sqs_client = _make_boto_client("sqs")
+    try:
+        sqs_client.get_queue_attributes(
+            QueueUrl=queue_url,
+            AttributeNames=["ApproximateNumberOfMessages"],
+        )
+    except Exception as exc:  # pragma: no cover - network
+        raise WorkerConfigurationError(
+            f"Unable to access SQS queue at {queue_url}: {exc}"
+        ) from exc
+
+    logger.info("Worker environment verified: PostgreSQL and SQS are reachable.")
+
+
 class PermanentJobError(Exception):
     """Raised when a job cannot succeed even with retries (e.g., invalid input)."""
 
@@ -53,12 +108,27 @@ class JobResult:
     error: Optional[str] = None
 
 
-def _make_boto_client(service: str):
+def _make_boto_client(service: str, region_name: Optional[str] = None):
     settings = get_settings()
     kwargs: dict[str, str] = {}
     if settings.AWS_ACCESS_KEY_ID and settings.AWS_SECRET_ACCESS_KEY:
         kwargs["aws_access_key_id"] = settings.AWS_ACCESS_KEY_ID
         kwargs["aws_secret_access_key"] = settings.AWS_SECRET_ACCESS_KEY
+
+    # Extract region from SQS queue URL if provided and no region specified
+    if region_name is None and service == "sqs" and settings.AWS_SQS_QUEUE_URL:
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(settings.AWS_SQS_QUEUE_URL)
+            hostname_parts = parsed.hostname.split(".")
+            if len(hostname_parts) >= 2 and hostname_parts[0] == "sqs":
+                region_name = hostname_parts[1]
+        except Exception:  # pragma: no cover - defensive
+            pass
+
+    if region_name:
+        kwargs["region_name"] = region_name
+
     return boto3.client(service, **kwargs)
 
 
@@ -164,19 +234,17 @@ def _process_attempt(
         conn = get_connection()
         cur = conn.cursor()
         try:
-            from models import _backend
-            is_sqlite = _backend == "sqlite" if _backend else "sqlite3" in str(type(conn))
-            if is_sqlite:
-                cur.execute("SELECT id, status FROM uploads WHERE id = ?", (upload_id,))
-            else:
-                cur.execute("SELECT id, status FROM uploads WHERE id = %s", (upload_id,))
+            cur.execute("SELECT id, status FROM uploads WHERE id = %s", (upload_id,))
             row = cur.fetchone()
             if row:
-                logger.error(f"Upload {upload_id} exists in database but fetch_upload() returned None")
+                logger.error(
+                    "Upload %s exists in database but fetch_upload() returned None",
+                    upload_id,
+                )
             else:
-                logger.error(f"Upload {upload_id} does not exist in database")
+                logger.error("Upload %s does not exist in database", upload_id)
         except Exception as e:
-            logger.error(f"Error checking database for upload {upload_id}: {e}")
+            logger.error("Error checking database for upload %s: %s", upload_id, e)
         finally:
             cur.close()
         raise PermanentJobError(f"Upload {upload_id} was not found.")
@@ -251,6 +319,8 @@ def process_upload_job(
 ) -> JobResult:
     """Process a single upload job."""
     timestamp = now or datetime.datetime.utcnow()
+    # Status is already "processing" from when it was enqueued, but ensure it's set
+    # in case this is a recovery/re-enqueue scenario
     uploads_repo.mark_processing(upload_id)
 
     settings = get_settings()
@@ -279,86 +349,67 @@ def process_upload_job(
 def _recover_stuck_uploads() -> None:
     """Check for pending or processing uploads that are stuck and re-enqueue them."""
     try:
-        # CRITICAL: Reset connection to ensure we're using PostgreSQL
-        from models import reset_engine, get_connection
-        reset_engine()
-        
         from app.jobs.queue import enqueue_upload_job
-        from models import update_upload_status
-        
+        from models import get_connection, reset_engine, update_upload_status
+
+        reset_engine()
         conn = get_connection()
+        if "psycopg" not in str(type(conn)):
+            raise WorkerConfigurationError(
+                "Stuck-upload recovery requires PostgreSQL connectivity."
+            )
+
         cur = conn.cursor()
-        
-        from models import _backend
-        is_sqlite = _backend == "sqlite" if _backend else 'sqlite3' in str(type(conn))
-        
-        # Log which database we're checking
-        logger.debug(f"Recovering stuck uploads from {_backend if _backend else 'unknown'} database")
-        
-        all_stuck = []
-        
-        if is_sqlite:
-            # Check for ALL pending uploads (not just old ones - catch immediately if not enqueued)
-            cur.execute("""
-                SELECT id FROM uploads 
-                WHERE status = 'pending'
-                ORDER BY created_at ASC
-                LIMIT 20
-            """)
-            pending_rows = cur.fetchall()
-            
-            # Check for stuck processing uploads (older than 10 minutes)
-            cur.execute("""
-                SELECT id FROM uploads 
-                WHERE status = 'processing' 
-                AND datetime(created_at) < datetime('now', '-10 minutes')
-                ORDER BY created_at ASC
-                LIMIT 10
-            """)
-            processing_rows = cur.fetchall()
-        else:
-            # PostgreSQL - check for ALL pending uploads (not just old ones)
-            cur.execute("""
-                SELECT id FROM uploads 
-                WHERE status = 'pending'
-                ORDER BY created_at ASC
-                LIMIT 20
-            """)
-            pending_rows = cur.fetchall()
-            
-            # PostgreSQL - processing uploads (older than 10 minutes)
-            cur.execute("""
-                SELECT id FROM uploads 
-                WHERE status = 'processing' 
-                AND created_at < NOW() - INTERVAL '10 minutes'
-                ORDER BY created_at ASC
-                LIMIT 10
-            """)
-            processing_rows = cur.fetchall()
-        
-        # Collect all stuck uploads
+        logger.debug("Recovering stuck uploads using PostgreSQL backend.")
+
+        cur.execute(
+            """
+            SELECT id FROM uploads
+            WHERE status = 'pending'
+            ORDER BY created_at ASC
+            LIMIT 20
+            """
+        )
+        pending_rows = cur.fetchall() or []
+
+        cur.execute(
+            """
+            SELECT id FROM uploads
+            WHERE status = 'processing'
+              AND created_at < NOW() - INTERVAL '5 minutes'
+            ORDER BY created_at ASC
+            LIMIT 10
+            """
+        )
+        processing_rows = cur.fetchall() or []
+
+        all_stuck: list[tuple[str, int]] = []
         for row in pending_rows:
             upload_id = row[0] if isinstance(row, (list, tuple)) else row.get("id")
-            all_stuck.append(("pending", upload_id))
-        
+            if upload_id is not None:
+                all_stuck.append(("pending", int(upload_id)))
+
         for row in processing_rows:
             upload_id = row[0] if isinstance(row, (list, tuple)) else row.get("id")
-            all_stuck.append(("processing", upload_id))
-        
+            if upload_id is not None:
+                all_stuck.append(("processing", int(upload_id)))
+
         if all_stuck:
-            logger.info(f"Found {len(all_stuck)} stuck upload(s), re-enqueueing...")
+            logger.info("Found %s stuck upload(s). Re-enqueuing…", len(all_stuck))
             for status, upload_id in all_stuck:
                 try:
-                    # Reset status to pending before re-enqueueing
-                    update_upload_status(int(upload_id), "pending")
-                    enqueue_upload_job(int(upload_id))
-                    logger.info(f"Re-enqueued stuck {status} upload {upload_id}")
-                except Exception as e:
-                    logger.warning(f"Failed to re-enqueue upload {upload_id}: {e}")
-        
+                    logger.info("Attempting to re-enqueue stuck %s upload %s", status, upload_id)
+                    update_upload_status(upload_id, "pending")
+                    enqueue_upload_job(upload_id)
+                    logger.info("Successfully re-enqueued stuck %s upload %s to SQS", status, upload_id)
+                except Exception as exc:  # pragma: no cover - defensive
+                    logger.error(
+                        "FAILED to re-enqueue upload %s: %s", upload_id, exc, exc_info=True
+                    )
+
         cur.close()
-    except Exception as e:
-        logger.warning(f"Error checking for stuck uploads: {e}")
+    except Exception as exc:
+        logger.warning("Error checking for stuck uploads: %s", exc)
 
 
 def run_worker_loop(stop_after: Optional[int] = None) -> None:
@@ -368,6 +419,7 @@ def run_worker_loop(stop_after: Optional[int] = None) -> None:
     Args:
         stop_after: Optional number of jobs to process before exiting (useful for tests).
     """
+    _verify_worker_environment()
     processed = 0
     settings = get_settings()
     
@@ -381,7 +433,15 @@ def run_worker_loop(stop_after: Optional[int] = None) -> None:
     recovery_interval = 60  # 1 minute
 
     while True:
-        job = dequeue_upload_job(timeout=settings.JOB_POLL_INTERVAL_SECONDS)
+        try:
+            job = dequeue_upload_job(timeout=settings.JOB_POLL_INTERVAL_SECONDS)
+        except Exception as exc:
+            logger.error("Error dequeuing job from SQS: %s", exc, exc_info=True)
+            # Wait a bit before retrying to avoid tight loop
+            import time
+            time.sleep(5)
+            continue
+        
         if job is None:
             # Periodically check for stuck uploads
             current_time = time.time()
@@ -394,24 +454,25 @@ def run_worker_loop(stop_after: Optional[int] = None) -> None:
             continue
 
         upload_id = int(job["upload_id"])
-        logger.info(f"Processing upload job {upload_id}...")
+        logger.info("Processing upload job %s (processed %s so far in this session)", upload_id, processed)
         try:
             result = process_upload_job(upload_id)
             if result.success:
-                logger.info(f"Successfully processed upload {upload_id}")
+                logger.info("Successfully processed upload %s", upload_id)
             else:
-                logger.warning(f"Failed to process upload {upload_id}: {result.error}")
+                logger.warning("Failed to process upload %s: %s", upload_id, result.error)
         except Exception as exc:
             # Safety net: if process_upload_job itself crashes, try to mark as failed
-            logger.exception(f"CRITICAL: process_upload_job crashed for upload {upload_id}: {exc}")
+            logger.exception("CRITICAL: process_upload_job crashed for upload %s: %s", upload_id, exc)
             try:
                 uploads_repo.mark_failed(upload_id)
-                logger.info(f"Marked upload {upload_id} as failed after crash")
+                logger.info("Marked upload %s as failed after crash", upload_id)
             except Exception as mark_error:
-                logger.error(f"Could not mark upload {upload_id} as failed: {mark_error}")
+                logger.error("Could not mark upload %s as failed: %s", upload_id, mark_error)
         finally:
             # Always ack the job so it doesn't get redelivered
             ack_job(job)
+            logger.debug("Acknowledged job for upload %s, continuing to next message", upload_id)
 
         processed += 1
         if stop_after is not None and processed >= stop_after:
@@ -444,21 +505,24 @@ if __name__ == "__main__":
     signal.signal(signal.SIGTERM, signal_handler)
 
     logger.info("Starting WordBridge background worker...")
-    
+
+    try:
+        _verify_worker_environment()
+    except WorkerConfigurationError as exc:
+        logger.error("Worker configuration error: %s", exc)
+        sys.exit(1)
+
     # Ensure we're using the correct database connection
     # Reset connection to ensure we pick up environment variables
     reset_engine()
-    
-    # Verify database configuration
+
+    # Log database configuration (mask credentials)
     settings = get_settings()
-    database_url = settings.DATABASE_URL
+    database_url = settings.DATABASE_URL or ""
     if database_url:
-        # Mask password in logs
         masked_url = database_url.split("@")[-1] if "@" in database_url else database_url
-        logger.info(f"Database URL configured: postgresql://***@{masked_url}")
-    else:
-        logger.warning("DATABASE_URL not set, will use default SQLite database")
-    
+        logger.info("Database URL configured: postgresql://***@%s", masked_url)
+
     # Initialize database to ensure tables exist
     try:
         logger.info("Initializing database...")
@@ -470,18 +534,11 @@ if __name__ == "__main__":
         # Verify connection works and can query uploads
         from models import get_connection
         conn = get_connection()
-        # Check connection type directly since _backend might not be set yet
-        is_postgres = "psycopg" in str(type(conn))
-        backend = "PostgreSQL" if is_postgres else "SQLite"
-        logger.info(f"Database initialized successfully (using {backend})")
-        
-        # Test that we can actually query the database
+        logger.info("Database initialized successfully (using PostgreSQL)")
+
         cur = conn.cursor()
         try:
-            if is_postgres:
-                cur.execute("SELECT COUNT(*) FROM uploads")
-            else:
-                cur.execute("SELECT COUNT(*) FROM uploads")
+            cur.execute("SELECT COUNT(*) FROM uploads")
             result = cur.fetchone()
             count = result[0] if isinstance(result, (tuple, list)) else result.get("count", 0) if isinstance(result, dict) else 0
             logger.info(f"Database connection verified - found {count} upload(s) in database")

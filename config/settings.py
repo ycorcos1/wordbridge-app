@@ -1,5 +1,34 @@
 import os
 from dataclasses import dataclass
+from pathlib import Path
+
+# Track if .env has been loaded to avoid reloading multiple times
+_ENV_LOADED = False
+
+
+def _ensure_env_loaded() -> None:
+    """Automatically load .env file from project root if not already loaded."""
+    global _ENV_LOADED
+    if _ENV_LOADED:
+        return
+    
+    try:
+        from dotenv import load_dotenv
+        
+        # Find project root (parent of config directory)
+        base_dir = Path(__file__).resolve().parent.parent
+        env_path = base_dir / ".env"
+        
+        if env_path.exists():
+            load_dotenv(env_path, override=True)
+        else:
+            # Fallback: try loading from current directory
+            load_dotenv(override=True)
+        
+        _ENV_LOADED = True
+    except ImportError:
+        # python-dotenv not installed, skip
+        pass
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -31,6 +60,8 @@ class Settings:
 
 
 def get_settings() -> Settings:
+    """Get application settings, automatically loading .env file if needed."""
+    _ensure_env_loaded()
     return Settings(
         SECRET_KEY=os.getenv("SECRET_KEY", "dev-insecure-key"),
         OPENAI_API_KEY=os.getenv("OPENAI_API_KEY"),
